@@ -564,9 +564,6 @@ int main(int argc, char* argv[]){
 
 	A3200Handle handle = NULL;					//create a handle for the stage API
 	FILE * file = NULL;							//create a file handle
-	DOUBLE footstep[2] ;
-	footstep[0] = 0.5;
-	footstep[1] = 15;
 	int grabs = 20;								//number of frames grabbed
 	int Fra_Number = 10;						//number of images grabbed for a single fram
 	DOUBLE result_stage;
@@ -612,13 +609,15 @@ int main(int argc, char* argv[]){
 
 	//connect to the A3200 Aerotech stage controller
 	printf("Connecting to A3200. Initializing if necessary.\n");
-	if(!A3200Connect(&handle))										//attempt to connect to the controller
-		PrintError(); goto cleanup;									//if there is an error, return
+	if(!A3200Connect(&handle)){										//attempt to connect to the controller
+		PrintError();
+		goto cleanup;
+	}																//if there is an error, return
 
-	//TODO: there should only be one axis enabled
 	printf("Enabling Axis.\n");										//enable the axis
-	if(!A3200MotionEnable(handle, TASKID_01, (AXISMASK)(AXISMASK_00 | AXISMASK_01))){
-		PrintError(); goto cleanup;
+	if(!A3200MotionEnable(handle, TASKID_01, AXISMASK_00)){
+		PrintError(); 
+		goto cleanup;
 	}
 
 	//Executing a linear motion
