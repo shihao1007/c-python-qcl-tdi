@@ -620,30 +620,30 @@ int main(int argc, char* argv[]){
 		goto cleanup;
 	}
 
-	//Executing a linear motion
+	//perform an imaging pass across the sample
 	for (int i = 0; i < grabs; i++){
-		A3200CommandExecute(handle, TASKID_01, "LINEAR Z0.00125", &result_stage);
-		A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);
-		result = CreateDisplayImageExample(handle_ips, i, Fra_Number);
-		if (IPS_FAILED(result)){
-			cout << "CreateDisplayImageExample failed.  Error code = " << result << endl;
-			 return result;
+		A3200CommandExecute(handle, TASKID_01, "LINEAR Z0.00125", &result_stage);	//move the stage
+		A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);	//wait
+		result = CreateDisplayImageExample(handle_ips, i, Fra_Number);				//capture images
+		if (IPS_FAILED(result)){													//if the capture didn't work
+			cout << "CreateDisplayImageExample failed.  Error code = " << result << endl;	//display an error
+			 return result;															//return
 		 }
 
-		cout << i+1 <<"% Finished." << endl;
+		cout << (float)(i + 1) / (float)grabs * 100 <<" % Finished." << endl;						//display the number of images
 
-		A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);
+		A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);	//wait again
 	}
 
+	//TODO: probably remove this stuff
 	result = JamSyncModeExample(handle_ips);
 	if (IPS_FAILED(result)){
 	 cout << "JamSyncModeExample failed.  Error code = " << result << endl;
 	}
 
-	if (handle_ips){
-		// Always clean up.
+	//clean up camera handle
+	if (handle_ips)
 		result = IPS_DeinitAcq(handle_ips);
-	}
 
 	return result;
 
