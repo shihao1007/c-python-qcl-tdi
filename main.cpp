@@ -635,12 +635,6 @@ int main(int argc, char* argv[]){
 		A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);	//wait again
 	}
 
-	//TODO: probably remove this stuff
-	result = JamSyncModeExample(handle_ips);
-	if (IPS_FAILED(result)){
-	 cout << "JamSyncModeExample failed.  Error code = " << result << endl;
-	}
-
 	//clean up camera handle
 	if (handle_ips)
 		result = IPS_DeinitAcq(handle_ips);
