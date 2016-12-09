@@ -12,10 +12,15 @@
 #include <stdio.h>			//standard input and output
 #include <tchar.h>			//Windows Unicode stuff
 #include "A3200.h"			//Aerotech libraries
+#include <stim/parser/arguments.h>
+#include <sstream>
 
 const int fpa_size = 128;
-int grabs = 500;			//number of grabs
 int fpg = 1;				//number of frames per grab
+
+A3200Handle hstage = NULL;	//handle for the stage controller
+
+std::string dest_path;		//stores the destination path for all output files
 
 const char * DEFAULT_CONFIG = "<ips_config>"
                               "   <winir_inipath>$(IPS_SDK_DATA_DIR)\\Config\\winir.ini</winir_inipath>"
@@ -33,11 +38,14 @@ void ipsHandleError(int32_t err, const char* file, int line) {
 	std::cout << "ERROR: Failed to get capture source (# " << err << ") in "<<file<< "line "<<line<<std::endl;
 	exit(err);
 }
-
 #define CHECK_IPS( err ) (ipsHandleError(err, __FILE__, __LINE__))
 
-//TODO: need an err function for stage
-
+void aerotechHandleError(bool err, const char* file, int line) {			//function for handling errors from the Aerotech stage controller
+	CHAR data[1024];
+	A3200GetLastErrorString(data, 1024);
+	std::cout<<"Aerotech ERROR: "<<data<<std::endl;	
+	exit(1);
+}
 #define CHECK_A3200( err ) (ipsHandleError(err, __FILE__, __LINE__))
 
 void ipsPrintCaptureSource(uint32_t src) {
@@ -48,7 +56,7 @@ void ipsPrintCaptureSource(uint32_t src) {
 				IPS_DEVICE_TYPE_CAMERALINK,
 				src,
 				capture_source, sizeof(capture_source),
-				capture_source_descr, sizeof(capture_source_descr));
+				capture_source_descr, sizeof(capture_source_descr)));
 	std::cout << "capture source ID: " << src << std::endl;
 	std::cout << "name: " << capture_source << std::endl;
 	std::cout << "description: " << capture_source_descr << std::endl;
@@ -65,6 +73,7 @@ uint32_t GetFirstAVailableCaptureSource(std::string & first_capture_source) {
 		std::cout << "No capture sources were found." << std::endl;;			//display an error
 		exit(1);																//exit
 	}
+	return nc;																	//return the number of capture sources
 }
 
 
@@ -73,30 +82,16 @@ void Initialize_SBF161_Decommute_Table( int grab_num_cols,
                                         int grab_num_rows,
                                         int display_num_cols,
                                         int display_num_rows,
-                                        std::vector<int> & decommute_table)
-{
-  int num_pixels = grab_num_cols * grab_num_rows;
-
-  for (int i = 0; i < num_pixels; i++)
-  {
-    int display_row = (i % 4) + 4 * (i / grab_num_cols);
-    int display_col = (i / 4) % display_num_cols;
-    int display_pixel = display_row * display_num_cols + display_col;
-    if (display_pixel < decommute_table.size())
-    {
-      decommute_table[display_pixel] = i;
-    }
-  }
-}
-
-std::string GetModuleDirectory()
-{
-  char szModuleFileName[MAX_PATH+1], szDrive[_MAX_DRIVE+1], szDir[_MAX_DIR+1], szFile[_MAX_FNAME+1], szExt[_MAX_EXT+1];
-  GetModuleFileName(NULL, szModuleFileName,MAX_PATH+1);
-  _splitpath(szModuleFileName,szDrive,szDir,szFile,szExt);
-  char szDirectoryName[MAX_PATH+1];
-  _makepath(szDirectoryName, szDrive, szDir, NULL, NULL);
-  return std::string(szDirectoryName);
+                                        std::vector<int> & decommute_table){
+	unsigned num_pixels = grab_num_cols * grab_num_rows;
+	for (unsigned i = 0; i < num_pixels; i++){
+		unsigned display_row = (i % 4) + 4 * (i / grab_num_cols);
+		unsigned display_col = (i / 4) % display_num_cols;
+		unsigned display_pixel = display_row * display_num_cols + display_col;
+		if (display_pixel < decommute_table.size()){
+			decommute_table[display_pixel] = i;
+		}
+	}
 }
 
 std::string GetPGMFileName(const std::string &  parent_directory,
@@ -125,37 +120,37 @@ void SaveGrayScalePGM(uint16_t * p_pixel_data, int width, int height, const std:
   ofile.close();
 } 
 
-int32_t CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fpg)
+void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fpg)
 {
-  uint32_t frame_width = 128;
-  uint32_t frame_height = 128;
-  int bytes_per_pixel = 2;
-  int frame_data_size = frame_width * frame_height * bytes_per_pixel;
+	uint32_t frame_width = 128;
+	uint32_t frame_height = 128;
+	int bytes_per_pixel = 2;
+	int frame_data_size = frame_width * frame_height * bytes_per_pixel;
 
-  // Configure the frame acquisition window size
-  CHECK_IPS(IPS_SetFrameWindow( handle_ips, 
-                                0,
-                                0,
-                                frame_width,
-                                frame_height));
+	// Configure the frame acquisition window size
+	CHECK_IPS(IPS_SetFrameWindow( handle_ips, 
+								0,
+								0,
+								frame_width,
+								frame_height));
 
-  // Start capturing a block of fpg frames
-  VMemory<uint8_t> buffer(frame_data_size*fpg);
-  CHECK_IPS(IPS_StartGrabbing( handle_ips,         
-                              fpg,            // Capture Fra_Number frames then stop capturing
-                              buffer.data(), // User allocated buffer
-                              buffer.size(), // size of user allocated buffer
-                              false));        // No wrap
+	// Start capturing a block of fpg frames
+	tsi::ips::VMemory<uint8_t> buffer(frame_data_size*fpg);
+	CHECK_IPS(IPS_StartGrabbing( handle_ips,         
+								fpg,            // Capture Fra_Number frames then stop capturing
+								buffer.data(), // User allocated buffer
+								buffer.size(), // size of user allocated buffer
+								false));        // No wrap
 
-  // Wait for all frames to be acquired
-  uint64_t frame_number;
-  uint8_t * p_frame = NULL;
-  CHECK_IPS(IPS_WaitFrame(handle_ips,
-           fpg,                          // Wait until the number of frame has been captured
-           IPS_TIMEOUT_WAIT_FOREVER,    // Don't time out, wait for ever
-           false,                       // Pause after WaitFrame returns
-           &p_frame,                    // Return a pointer to the frame
-           &frame_number));              // Return the frame number of the returned frame
+	// Wait for all frames to be acquired
+	uint64_t frame_number;
+	uint8_t * p_frame = NULL;
+	CHECK_IPS(IPS_WaitFrame(handle_ips,
+								fpg,                          // Wait until the number of frame has been captured
+								IPS_TIMEOUT_WAIT_FOREVER,    // Don't time out, wait for ever
+								false,                       // Pause after WaitFrame returns
+								&p_frame,                    // Return a pointer to the frame
+								&frame_number));              // Return the frame number of the returned frame
 
 
   // *********** Decommute ********************
@@ -165,7 +160,7 @@ int32_t CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int
   // in the second column and so on to the last column.  Then it continues to rows 5-8 and so on.
 
   // Create a decommute table for recording the pixels for display as an image
-  vector<int> decommute_table(frame_width*frame_height);
+  std::vector<int> decommute_table(frame_width*frame_height);
   Initialize_SBF161_Decommute_Table(frame_width * 4,
                                     frame_height/4,
                                     frame_width,
@@ -173,9 +168,9 @@ int32_t CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int
                                     decommute_table);
 
   // Decommute the images.
-  vector<uint16_t> display_image(frame_width * frame_height);
-  std::string module_dir = GetModuleDirectory();
-  std::string image_dir = module_dir + "\Frames1800\\" ;
+  std::vector<uint16_t> display_image(frame_width * frame_height);
+  //std::string module_dir = GetModuleDirectory();
+  //std::string image_dir = module_dir + "\Frames1800\\";
 
   for (int frame_index = 0; frame_index < frame_number; frame_index++)
   {
@@ -183,7 +178,7 @@ int32_t CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int
     uint16_t * p_image = (uint16_t* ) (buffer.data() + frame_index*frame_data_size);
 
     // Decommute the image
-    for (int i = 0; i < display_image.size(); i++)
+    for (unsigned i = 0; i < display_image.size(); i++)
     {
       display_image[i] = p_image[decommute_table[i]];
 
@@ -198,74 +193,102 @@ int32_t CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int
     SaveGrayScalePGM( p_display_image,
                       frame_width,
                       frame_height,
-                      GetPGMFileName(image_dir, "sbf161_img", grab_index, frame_index+1));
+                      GetPGMFileName(dest_path, "sbf161_img", grab_index, frame_index+1));
   }
 
   // Stop acquiring frames
   CHECK_IPS(IPS_StopGrabbing(handle_ips));
+}
 
+void ipsPrintDiagnostics(HANDLE_IPS_ACQ handle) {
+	// Display the camera and frame grabber diagnostic data
+	std::vector<char> diag_buffer(IPS_MAX_DIAGNOSTIC_STRING_BYTES);		//allocate a character array
+	uint32_t diag_buffer_size(0);									//initialize the buffer size to zero (0)
+																	//get the camera diagnostics - fill diag_buffer with a string describing the camera status								
+	CHECK_IPS(IPS_GetCameraDiagnostics(handle,
+							diag_buffer.data(),
+							(uint32_t)diag_buffer.size(),
+							&diag_buffer_size));
+
+	if (strlen(diag_buffer.data()) == diag_buffer_size - 1)			//if the diagnostic string exists
+		std::cout << "Camera diagnostics : " << std::string(diag_buffer.data()) << std::endl;	//print it
+																								//get the frame grabber diagnostics
+	CHECK_IPS(IPS_GetFrameGrabberDiagnostics(handle,
+							diag_buffer.data(),
+							(uint32_t)diag_buffer.size(),
+							&diag_buffer_size));
+
+	if (strlen(diag_buffer.data()) == diag_buffer_size - 1)			//if the diagnostic string exists
+		std::cout << "Frame grabber diagnostics : " << std::string(diag_buffer.data()) << std::endl;	//print it
+}
+
+void aerotechCleanup(A3200Handle h) {
+	CHECK_A3200(A3200ProgramStop(h, TASKID_01));
+	CHECK_A3200(A3200MotionDisable(h, TASKID_01, AXISMASK_00));
+	CHECK_A3200(A3200Disconnect(h));
 }
 
 int main(int argc, char* argv[]) {
 
-	A3200Handle handle = NULL;					//create a handle for the stage API
+	stim::arglist args;
+	args.add("help", "prints usage information");
+	args.add("grabs", "total number of images to collect", "500", "integer (currently between 1 and 500)");
+	args.add("footstep", "number of micrometers between images", "5", "positive value describing stage motion in microns");
+	args.parse(argc, argv);
+
+	if(args.nargs() > 0) dest_path = args.arg(0);						//get the destination path (if specified
+
 	DOUBLE result_stage;
 
 	std::string capture_source;					//stores the text-name of the available capture source
 	int32_t src = GetFirstAVailableCaptureSource(capture_source);		//get the first available capture source
 	
-	//TODO: change the capture source if the user says to do so
-
 	std::cout<<"Using the following capture source for imaging----------" << std::endl;
 	ipsPrintCaptureSource(src);
 
-	//initialize the first capture source (from the name above)
-	HANDLE_IPS_ACQ handle_ips = NULL;			//declare a handle to the camera
-	src = IPS_InitAcq(CAM_ID_SBF161,  		//Configure the SBF 161 camera
-	                    capture_source.c_str(),	//name collected from the above function
+	HANDLE_IPS_ACQ hcam = NULL;									//declare a handle to the camera
+	CHECK_IPS(IPS_InitAcq(CAM_ID_SBF161,  									//Configure the SBF 161 camera
+	                    capture_source.c_str(),							//name collected from the above function
 	                    DEFAULT_CONFIG,
-	                    "$(IPS_SDK_DATA_DIR)\\license.lcx",
-	                    &handle_ips);
+	                    "$(IPS_SDK_DATA_DIR)\\license.lcx",				//specify the license
+	                    &hcam));											//fill the handle
 
-	// Display the camera and frame grabber diagnostic data
-	vector<char> diag_buffer(IPS_MAX_DIAGNOSTIC_STRING_BYTES);		//allocate a character array
-	uint32_t diag_buffer_size(0);									//initialize the buffer size to zero (0)
-	//get the camera diagnostics - fill diag_buffer with a string describing the camera status								
-	CHECK_IPS(src = IPS_GetCameraDiagnostics(handle_ips,
-	                                diag_buffer.data(),
-	                                (uint32_t) diag_buffer.size(),
-	                                &diag_buffer_size));
-
-	if (strlen(diag_buffer.data()) == diag_buffer_size-1)			//if the diagnostic string exists
-		std::cout << "Camera diagnostics : " << std::string(diag_buffer.data()) << std::endl;	//print it
-	//get the frame grabber diagnostics
-	CHECK_IPS(src = IPS_GetFrameGrabberDiagnostics( handle_ips,
-	                                          diag_buffer.data(),
-	                                          (uint32_t) diag_buffer.size(),
-	                                          &diag_buffer_size));
-
-	if (strlen(diag_buffer.data()) == diag_buffer_size-1)			//if the diagnostic string exists
-		std::cout << "Frame grabber diagnostics : " << std::string(diag_buffer.data()) << std::endl;	//print it
+	ipsPrintDiagnostics(hcam);
 
 	//connect to the A3200 Aerotech stage controller
-	std::cout <<"Connecting to A3200. Initializing if necessary."<< std::endl;
-	CHECK_A3200(A3200Connect(&handle));								//attempt to connect to the controller
-        															//if there is an error, return
+	std::cout <<"Connecting to A3200...";
+	CHECK_A3200(A3200Connect(&hstage));										//attempt to connect to the controller
+	std::cout << "done" << std::endl;
 
-	std::cout <<"Enabling Axis."<< std::endl;			    		//enable the axis
-	CHECK_A3200(A3200MotionEnable(handle, TASKID_01, AXISMASK_00));
+	std::cout <<"Enabling axes...";			    							//enable the axes
+	CHECK_A3200(A3200MotionEnable(hstage, TASKID_01, AXISMASK_00));
+	std::cout << "done" << std::endl;
+
+	int grabs = args["grabs"].as_int();									//get the number of images to be acquired
 
 	//perform an imaging pass across the sample
+	std::stringstream ss;												//create an empty string stream
+	float dz = (float)args["zstep"].as_float() * 0.001f;						//get the z step size in micrometers and convert to millimeters
+	ss << "LINEAR Z"<<dz;												//append to the command string
+	std::string cmd_step = ss.str();									//store the move command in a string
+
+	ss.clear();
+	float zpass = dz * grabs;											//calculate the length of an entire imaging pass
+	ss << "LINEAR Z-" << zpass;											//generate the stage return command
+	std::string cmd_return = ss.str();									//store in a string
+
 	for (int i = 0; i < grabs; i++){
-		A3200CommandExecute(handle, TASKID_01, "LINEAR Z0.005", &result_stage);	//move the stage
-		//A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);	//wait
-		CHECK_IPS(src = CreateDisplayImageExample(handle_ips, i, fpg));				//capture images
+		
+		
+		A3200CommandExecute(hstage, TASKID_01, cmd_step.c_str(), &result_stage);		//move the stage
+		//A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);		//wait
+		CreateDisplayImageExample(hcam, i, fpg);											//capture images		 
 
-		 
+		std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;				//display the number of images
 
-		std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;		//display the number of images
-
-		//A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);	//wait again
+		//A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);		//wait again
 	}
-	A3200CommandExecute(handle, TASKID_01, "LINEAR Z-2.5", &result_stage);  //move stage back to origin
+	A3200CommandExecute(hstage, TASKID_01, cmd_return.c_str(), &result_stage);				//move stage back to origin
+
+	aerotechCleanup(hstage);																//shut down the stage
 }

@@ -13,6 +13,9 @@ find_package(Threads)
 #find the X11 package
 find_package(X11)
 
+#find the STIM package
+find_package(STIM REQUIRED)
+
 #ask for the Aerotech A3200 library file
 find_library(AEROTECH_LIB NAMES A3200C.lib PATHS lib32)
 
@@ -29,6 +32,7 @@ endif ( MSVC )
 
 include_directories(
 					"include"
+					${STIM_INCLUDE_DIR}
 					)
 
 #Assign source files to the appropriate variables
