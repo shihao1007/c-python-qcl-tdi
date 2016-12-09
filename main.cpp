@@ -359,7 +359,7 @@ int32_t CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int
   // Decommute the images.
   vector<uint16_t> display_image(frame_width * frame_height);
   string module_dir = GetModuleDirectory();
-  string image_dir = module_dir + "\Frames\\" ;
+  string image_dir = module_dir + "\Frames1800\\" ;
 
   for (int frame_index = 0; frame_index < frame_number; frame_index++)
   {
@@ -373,7 +373,7 @@ int32_t CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int
 
       // Invert the image pixel 
 	  // uncomment the following line to invert the image
-      //display_image[i] = display_image[i] ^ 0x3FFF;
+      display_image[i] = display_image[i] ^ 0x3FFF;
     }
 
     uint16_t * p_display_image = display_image.data();
@@ -564,8 +564,8 @@ int main(int argc, char* argv[]){
 
 	A3200Handle handle = NULL;					//create a handle for the stage API
 	FILE * file = NULL;							//create a file handle
-	int grabs = 20;								//number of frames grabbed
-	int Fra_Number = 10;						//number of images grabbed for a single fram
+	int grabs = 500;								//number of frames grabbed
+	int Fra_Number = 1;						//number of images grabbed for a single fram
 	DOUBLE result_stage;
 	char tmp[LINE_SIZE], command[LINE_SIZE * NUM_LINES];
 	int i;
@@ -622,18 +622,19 @@ int main(int argc, char* argv[]){
 
 	//perform an imaging pass across the sample
 	for (int i = 0; i < grabs; i++){
-		A3200CommandExecute(handle, TASKID_01, "LINEAR Z0.00125", &result_stage);	//move the stage
-		A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);	//wait
+		A3200CommandExecute(handle, TASKID_01, "LINEAR Z0.005", &result_stage);	//move the stage
+		//A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);	//wait
 		result = CreateDisplayImageExample(handle_ips, i, Fra_Number);				//capture images
 		if (IPS_FAILED(result)){													//if the capture didn't work
 			cout << "CreateDisplayImageExample failed.  Error code = " << result << endl;	//display an error
 			 return result;															//return
 		 }
 
-		cout << (float)(i + 1) / (float)grabs * 100 <<" % Finished." << endl;						//display the number of images
+		cout << (float)(i + 1) / (float)grabs * 100 <<" %." << endl;		//display the number of images
 
-		A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);	//wait again
+		//A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);	//wait again
 	}
+	A3200CommandExecute(handle, TASKID_01, "LINEAR Z-2.5", &result_stage);  //move stage back to origin
 
 	//clean up camera handle
 	if (handle_ips)
