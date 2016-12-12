@@ -14,6 +14,7 @@
 #include "A3200.h"			//Aerotech libraries
 #include <stim/parser/arguments.h>
 #include <sstream>
+#include <stim/ui/progressbar.h>
 
 const int fpa_size = 128;
 int fpg = 1;				//number of frames per grab
@@ -35,8 +36,10 @@ const char * DEFAULT_CONFIG = "<ips_config>"
                               " </ips_config>";
 
 void ipsHandleError(int32_t err, const char* file, int line) {
-	std::cout << "ERROR: Failed to get capture source (# " << err << ") in "<<file<< "line "<<line<<std::endl;
-	exit(err);
+	if(!IPS_SUCCEEDED(err)){
+		std::cout << "IPS ERROR (# " << err << ") in "<<file<< " line "<<line<<std::endl;
+		exit(err);
+	}
 }
 #define CHECK_IPS( err ) (ipsHandleError(err, __FILE__, __LINE__))
 
@@ -48,7 +51,7 @@ void aerotechHandleError(bool err, const char* file, int line) {			//function fo
 }
 #define CHECK_A3200( err ) (ipsHandleError(err, __FILE__, __LINE__))
 
-void ipsPrintCaptureSource(uint32_t src) {
+std::string ipsPrintCaptureSource(uint32_t src) {
 	char capture_source[IPS_MAX_CAPTURE_SOURCE_BYTES];						//allocate space for strings
 	char capture_source_descr[IPS_MAX_CAPTURE_SOURCE_BYTES];
 
@@ -60,12 +63,11 @@ void ipsPrintCaptureSource(uint32_t src) {
 	std::cout << "capture source ID: " << src << std::endl;
 	std::cout << "name: " << capture_source << std::endl;
 	std::cout << "description: " << capture_source_descr << std::endl;
+	return std::string(capture_source);
 }
 
 //get the string indicating the first available capture source (source 0)
-uint32_t GetFirstAVailableCaptureSource(std::string & first_capture_source) {
-	first_capture_source.clear();												//empty the string
-
+uint32_t GetFirstAVailableCaptureSource() {
 	uint32_t nc = 0;																//store the number of sources
 	CHECK_IPS(IPS_GetCaptureSourceCount(IPS_DEVICE_TYPE_CAMERALINK, &nc));			//get the number of sources
 	
@@ -73,7 +75,7 @@ uint32_t GetFirstAVailableCaptureSource(std::string & first_capture_source) {
 		std::cout << "No capture sources were found." << std::endl;;			//display an error
 		exit(1);																//exit
 	}
-	return nc;																	//return the number of capture sources
+	return 0;																	//return the number of capture sources
 }
 
 
@@ -228,23 +230,30 @@ void aerotechCleanup(A3200Handle h) {
 	CHECK_A3200(A3200Disconnect(h));
 }
 
+
 int main(int argc, char* argv[]) {
 
 	stim::arglist args;
 	args.add("help", "prints usage information");
 	args.add("grabs", "total number of images to collect", "500", "integer (currently between 1 and 500)");
-	args.add("footstep", "number of micrometers between images", "5", "positive value describing stage motion in microns");
+	args.add("zstep", "number of micrometers between images", "5", "positive value describing stage motion in microns");
 	args.parse(argc, argv);
 
-	if(args.nargs() > 0) dest_path = args.arg(0);						//get the destination path (if specified
+	if(args["help"]){
+		std::cout<<args.str();
+		exit(1);
+	}
+
+	if(args.nargs() > 0) dest_path = args.arg(0);						//get the destination path (if specified)
+	if(dest_path.back() != '\\' || dest_path.back() != '/')
+		dest_path += "/";
 
 	DOUBLE result_stage;
 
-	std::string capture_source;					//stores the text-name of the available capture source
-	int32_t src = GetFirstAVailableCaptureSource(capture_source);		//get the first available capture source
+	int32_t src = GetFirstAVailableCaptureSource();		//get the first available capture source
 	
 	std::cout<<"Using the following capture source for imaging----------" << std::endl;
-	ipsPrintCaptureSource(src);
+	std::string capture_source = ipsPrintCaptureSource(src);
 
 	HANDLE_IPS_ACQ hcam = NULL;									//declare a handle to the camera
 	CHECK_IPS(IPS_InitAcq(CAM_ID_SBF161,  									//Configure the SBF 161 camera
@@ -284,7 +293,8 @@ int main(int argc, char* argv[]) {
 		//A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);		//wait
 		CreateDisplayImageExample(hcam, i, fpg);											//capture images		 
 
-		std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;				//display the number of images
+		rtsProgressBar((float)(i + 1) / (float)grabs * 100);
+		//std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;				//display the number of images
 
 		//A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);		//wait again
 	}
