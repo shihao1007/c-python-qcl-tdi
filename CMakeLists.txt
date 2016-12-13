@@ -24,6 +24,9 @@ find_library(TELEDYNE_ACQ_LIB NAMES ipsacq.lib PATHS lib32)
 find_library(TELEDYNE_SAPERA_LIB NAMES ipssaperalt.lib PATHS lib32)
 find_library(TELEDYNE_FRAMEGRAB_LIB NAMES sbfem.lib PATHS lib32)
 
+#ask for the MIRcat libraries
+find_library(MIRCAT_LIB NAMES MIRcatSDK.lib PATHS lib32)
+
 #build the executable in the binary directory on MS Visual Studio
 if ( MSVC )
 	SET( CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${OUTPUT_DIRECTORY}")
@@ -42,7 +45,7 @@ file(GLOB SRC_H "*.h")
 #create an executable file
 add_executable(qcl-tdi
 				${SRC_H}
-				${SRC_CPP}
+				main.cpp
 				)
 
 #set the link libraries
@@ -52,4 +55,19 @@ target_link_libraries(qcl-tdi
 						${TELEDYNE_SAPERA_LIB}
 						${TELEDYNE_FRAMEGRAB_LIB}
 						${CMAKE_THREAD_LIBS_INIT}
+		  )
+
+add_executable(qcl-control
+				${SRC_H}
+				qcl_api.cpp
+				)
+
+#set the link libraries
+target_link_libraries(qcl-control
+						${AEROTECH_LIB}
+						${TELEDYNE_ACQ_LIB}
+						${TELEDYNE_SAPERA_LIB}
+						${TELEDYNE_FRAMEGRAB_LIB}
+						${CMAKE_THREAD_LIBS_INIT}
+						${MIRCAT_LIB}
 		  )
