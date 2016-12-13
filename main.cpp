@@ -240,10 +240,10 @@ int main(int argc, char* argv[]) {
 	args.add("zstep", "number of micrometers between images", "5", "positive value describing stage motion in microns");
 	args.parse(argc, argv);
 
-	//if(args["help"]){
-	//	std::cout<<args.str();
-	//	exit(1);
-	//}
+	if(args["help"]){
+		std::cout<<args.str();
+		exit(1);
+	}
 
 	if(args.nargs() > 0) dest_path = args.arg(0);						//get the destination path (if specified)
 	if(dest_path.back() != '\\' || dest_path.back() != '/')
@@ -261,16 +261,16 @@ int main(int argc, char* argv[]) {
 	uint16_t maxCurPulsed, maxCurCw, tecCur;					//MIRcat variables
     
     printf( "========================================================\n");
-	std::cout <<"Getting API version...";						//get software version
+	std::cout <<"Getting API version...\n";						//get software version
 	if(!(MIRcatSDK_GetAPIVersion(&major, &minor, &patch))){
-		std::cout <<"API version: patch "<< ret <<"."<< major <<"."<<minor <<"."<< patch << std::endl;
-	}															//start with 0.x.x.xxxx means connected to API successfully
+		std::cout <<"API version: patch "<< major <<"."<<minor <<"."<< patch << std::endl;
+	}															
 	
 	std::cout <<"API initializing...";							
     if(!(MIRcatSDK_Initialize())){
     	std::cout << "done" << std::endl;
 		printf( "********************************************************\n");
-		printf( " Getting some system information ... \n" );
+		printf( "Getting some system information ... \n" );
 		printf( "********************************************************\n");
 		
 		char stringData[24];
@@ -284,7 +284,7 @@ int main(int argc, char* argv[]) {
 		
 		uint8_t numQcls;
 		if(!(MIRcatSDK_GetNumInstalledQcls(&numQcls))){		//get MIRcat hardware model number
-			std::cout <<"Number of installed QCLs:"<< numQcls << std::endl;	
+			std::cout <<"Number of installed QCLs: "<< (int)numQcls << std::endl;	
 		}
 
 		//
@@ -300,13 +300,17 @@ int main(int argc, char* argv[]) {
 		bool IsArmed = false;
 		bool atTemp = false;
 
+		printf( "********************************************************\n");
+		printf( "Turn on Laser ... \n" );
+		printf( "********************************************************\n");
 		if(!(MIRcatSDK_IsInterlockedStatusSet(&bIlockSet) && !bIlockSet)){
 			std::cout <<"Interlock Set"<< std::endl;
 			if(!(MIRcatSDK_IsLaserArmed(&IsArmed) && !IsArmed)){
+				ret = MIRcatSDK_ArmDisarmLaser();
+				std::cout <<"Arming Laser...";
 				while ( !IsArmed )
 			        {   
-						std::cout <<"Arming Laser...";
-            			ret = MIRcatSDK_IsLaserArmed(&IsArmed);
+						ret = MIRcatSDK_IsLaserArmed(&IsArmed);
             			::Sleep(1000);
         			}
         		std::cout << "done" << std::endl;
@@ -316,16 +320,20 @@ int main(int argc, char* argv[]) {
 		//
 		//wait until laser cool down to do tuning
 		//
-
+		printf( "********************************************************\n");
+		printf( "Cooling down Laser ... \n" );
+		printf( "********************************************************\n");
 		if(!(MIRcatSDK_AreTECsAtSetTemperature(&atTemp) && !atTemp)){
 			while ( !atTemp )
 			    {   
 					for( uint8_t i = 1; i <= numQcls; i++ )
 					{
-						if(!(MIRcatSDK_GetQCLTemperature( i, &qclTemp )) && !(MIRcatSDK_GetTecCurrent( i, &tecCur ))){
-							printf(" QCL%u Temp: %.3f C  TEC%u Current: %u mA\n", i, qclTemp, i, tecCur );
+						if(!(MIRcatSDK_GetQCLTemperature( i, &qclTemp )) && !(MIRcatSDK_GetTecCurrent( (int)i, &tecCur ))){
+							printf(" QCL%u    Temp: %.3f C     TEC%u       Current: %u mA\n", (int)i, qclTemp, (int)i, tecCur );
 						}						
 					}
+					printf( "********************************************************\n");
+					printf("   \n");
 					ret = MIRcatSDK_AreTECsAtSetTemperature(&atTemp);
 					::Sleep(1000);
         		}

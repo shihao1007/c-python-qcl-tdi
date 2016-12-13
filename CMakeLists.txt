@@ -55,6 +55,7 @@ target_link_libraries(qcl-tdi
 						${TELEDYNE_SAPERA_LIB}
 						${TELEDYNE_FRAMEGRAB_LIB}
 						${CMAKE_THREAD_LIBS_INIT}
+						${MIRCAT_LIB}
 		  )
 
 add_executable(qcl-control
