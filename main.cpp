@@ -12,6 +12,7 @@
 #include <stdio.h>			//standard input and output
 #include <tchar.h>			//Windows Unicode stuff
 #include "A3200.h"			//Aerotech libraries
+#include <MIRcatSDK.h>		//MIRcat libraries
 #include <stim/parser/arguments.h>
 #include <sstream>
 #include <stim/ui/progressbar.h>
@@ -239,16 +240,108 @@ int main(int argc, char* argv[]) {
 	args.add("zstep", "number of micrometers between images", "5", "positive value describing stage motion in microns");
 	args.parse(argc, argv);
 
-	if(args["help"]){
-		std::cout<<args.str();
-		exit(1);
-	}
+	//if(args["help"]){
+	//	std::cout<<args.str();
+	//	exit(1);
+	//}
 
 	if(args.nargs() > 0) dest_path = args.arg(0);						//get the destination path (if specified)
 	if(dest_path.back() != '\\' || dest_path.back() != '/')
 		dest_path += "/";
 
-	DOUBLE result_stage;
+	DOUBLE result_stage;										//return value used by Aerotech stage control
+
+	//
+	//Turn on laser
+	//
+
+	uint16_t major, minor, patch;								//MIRcat API version variables
+	uint32_t ret;												//return value used by MIRcat laser control
+	float minWW, maxWW, pulseRateMax, pulseWidthMax, pulseDutyCycleMax, qclTemp, minTemp, maxTemp, nomTemp;
+	uint16_t maxCurPulsed, maxCurCw, tecCur;					//MIRcat variables
+    
+    printf( "========================================================\n");
+	std::cout <<"Getting API version...";						//get software version
+	if(!(MIRcatSDK_GetAPIVersion(&major, &minor, &patch))){
+		std::cout <<"API version: patch "<< ret <<"."<< major <<"."<<minor <<"."<< patch << std::endl;
+	}															//start with 0.x.x.xxxx means connected to API successfully
+	
+	std::cout <<"API initializing...";							
+    if(!(MIRcatSDK_Initialize())){
+    	std::cout << "done" << std::endl;
+		printf( "********************************************************\n");
+		printf( " Getting some system information ... \n" );
+		printf( "********************************************************\n");
+		
+		char stringData[24];
+		if(!(MIRcatSDK_GetModelNumber( stringData, 24 ))){		//get MIRcat hardware model number
+			std::cout <<"Model Number:"<< stringData << std::endl;
+		}
+
+		if(!(MIRcatSDK_GetSerialNumber( stringData, 24 ))){		//get MIRcat serial number
+			std::cout <<"Serial Number:"<< stringData << std::endl;
+		}
+		
+		uint8_t numQcls;
+		if(!(MIRcatSDK_GetNumInstalledQcls(&numQcls))){		//get MIRcat hardware model number
+			std::cout <<"Number of installed QCLs:"<< numQcls << std::endl;	
+		}
+
+		//
+        //arm laser
+        //check to see if interlock is on
+        //if yes, arm the laser
+        //operation
+        //loop until arm is done
+        //
+
+		bool bIlockSet = false;
+        bool bKeySwitchSet = false;
+		bool IsArmed = false;
+		bool atTemp = false;
+
+		if(!(MIRcatSDK_IsInterlockedStatusSet(&bIlockSet) && !bIlockSet)){
+			std::cout <<"Interlock Set"<< std::endl;
+			if(!(MIRcatSDK_IsLaserArmed(&IsArmed) && !IsArmed)){
+				while ( !IsArmed )
+			        {   
+						std::cout <<"Arming Laser...";
+            			ret = MIRcatSDK_IsLaserArmed(&IsArmed);
+            			::Sleep(1000);
+        			}
+        		std::cout << "done" << std::endl;
+			}
+		}
+
+		//
+		//wait until laser cool down to do tuning
+		//
+
+		if(!(MIRcatSDK_AreTECsAtSetTemperature(&atTemp) && !atTemp)){
+			while ( !atTemp )
+			    {   
+					for( uint8_t i = 1; i <= numQcls; i++ )
+					{
+						if(!(MIRcatSDK_GetQCLTemperature( i, &qclTemp )) && !(MIRcatSDK_GetTecCurrent( i, &tecCur ))){
+							printf(" QCL%u Temp: %.3f C  TEC%u Current: %u mA\n", i, qclTemp, i, tecCur );
+						}						
+					}
+					ret = MIRcatSDK_AreTECsAtSetTemperature(&atTemp);
+					::Sleep(1000);
+        		}
+        	std::cout << "done" << std::endl;
+		}
+
+
+
+    }
+  	
+
+
+
+    //
+  	//Turn on FPA
+    //
 
 	int32_t src = GetFirstAVailableCaptureSource();		//get the first available capture source
 	
