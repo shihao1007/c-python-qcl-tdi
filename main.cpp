@@ -286,7 +286,7 @@ int main(int argc, char* argv[]) {
 		if(!(MIRcatSDK_GetNumInstalledQcls(&numQcls))){		//get MIRcat hardware model number
 			std::cout <<"Number of installed QCLs: "<< (int)numQcls << std::endl;	
 		}
-	}
+	
 
 		//
         //arm laser
@@ -340,7 +340,7 @@ int main(int argc, char* argv[]) {
         		}
         	std::cout << "done" << std::endl;
 		}
-
+	}
   	
     //
   	//Turn on FPA
