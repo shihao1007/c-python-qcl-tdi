@@ -370,7 +370,11 @@ int main(int argc, char* argv[]) {
 
 		//tuning laser
 
-		int wn = 1400 + wn_index * 8;
+		std::stringstream sub_dir;												//create an empty string stream
+		int wn = 1400 + wn_index * 8;										//get the sub folder for saving different wn images
+		sub_dir << dest_path << wn;												//append to the parent dir string
+		std::string dest_path = sub_dir.str();	
+
 		printf( "========================================================\n");
         std::cout << "Tuning to WN :" << wn << std::endl;
         if(!(MIRcatSDK_TuneToWW(wn, MIRcatSDK_UNITS_CM1, 0))){
