@@ -286,6 +286,7 @@ int main(int argc, char* argv[]) {
 		if(!(MIRcatSDK_GetNumInstalledQcls(&numQcls))){		//get MIRcat hardware model number
 			std::cout <<"Number of installed QCLs: "<< (int)numQcls << std::endl;	
 		}
+	}
 
 		//
         //arm laser
@@ -340,17 +341,13 @@ int main(int argc, char* argv[]) {
         	std::cout << "done" << std::endl;
 		}
 
-
-
-    }
   	
-
-
-
     //
   	//Turn on FPA
     //
-
+	printf( "********************************************************\n");
+	printf( "Turning on FPA ... \n" );
+	printf( "********************************************************\n");
 	int32_t src = GetFirstAVailableCaptureSource();		//get the first available capture source
 	
 	std::cout<<"Using the following capture source for imaging----------" << std::endl;
@@ -365,41 +362,71 @@ int main(int argc, char* argv[]) {
 
 	ipsPrintDiagnostics(hcam);
 
-	//connect to the A3200 Aerotech stage controller
-	std::cout <<"Connecting to A3200...";
-	CHECK_A3200(A3200Connect(&hstage));										//attempt to connect to the controller
-	std::cout << "done" << std::endl;
+	//
+	//imaging
+	//
 
-	std::cout <<"Enabling axes...";			    							//enable the axes
-	CHECK_A3200(A3200MotionEnable(hstage, TASKID_01, AXISMASK_00));
-	std::cout << "done" << std::endl;
+	for (int wn_index = 0; wn_index <= 40; wn_index++){
 
-	int grabs = args["grabs"].as_int();									//get the number of images to be acquired
+		//tuning laser
 
-	//perform an imaging pass across the sample
-	std::stringstream ss;												//create an empty string stream
-	float dz = (float)args["zstep"].as_float() * 0.001f;						//get the z step size in micrometers and convert to millimeters
-	ss << "LINEAR Z"<<dz;												//append to the command string
-	std::string cmd_step = ss.str();									//store the move command in a string
+		int wn = 1400 + wn_index * 8;
+		printf( "========================================================\n");
+        std::cout << "Tuning to WN :" << wn << std::endl;
+        if(!(MIRcatSDK_TuneToWW(wn, MIRcatSDK_UNITS_CM1, 0))){
 
-	ss.clear();
-	float zpass = dz * grabs;											//calculate the length of an entire imaging pass
-	ss << "LINEAR Z-" << zpass;											//generate the stage return command
-	std::string cmd_return = ss.str();									//store in a string
+        	bool isTuned = false;
+	        while(!isTuned)
+	        {
+	            ret = MIRcatSDK_IsTuned(&isTuned);
+	            ::Sleep(500);
+	        }
 
-	for (int i = 0; i < grabs; i++){
-		
-		
-		A3200CommandExecute(hstage, TASKID_01, cmd_step.c_str(), &result_stage);		//move the stage
-		//A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);		//wait
-		CreateDisplayImageExample(hcam, i, fpg);											//capture images		 
+        	std::cout << "Tuned to " << wn << std::endl;
+        }
 
-		rtsProgressBar((float)(i + 1) / (float)grabs * 100);
-		//std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;				//display the number of images
+        if(!(MIRcatSDK_TurnEmissionOn())){
+        	std::cout << "Laser Emission on." << std::endl;
+        }
 
-		//A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);		//wait again
+		//connect to the A3200 Aerotech stage controller
+		std::cout <<"Connecting to A3200...";
+		CHECK_A3200(A3200Connect(&hstage));										//attempt to connect to the controller
+		std::cout << "done" << std::endl;
+
+		std::cout <<"Enabling axes...";			    							//enable the axes
+		CHECK_A3200(A3200MotionEnable(hstage, TASKID_01, AXISMASK_00));
+		std::cout << "done" << std::endl;
+
+		int grabs = args["grabs"].as_int();									//get the number of images to be acquired
+
+		//perform an imaging pass across the sample
+		std::stringstream ss;												//create an empty string stream
+		float dz = (float)args["zstep"].as_float() * 0.001f;						//get the z step size in micrometers and convert to millimeters
+		ss << "LINEAR Z"<<dz;												//append to the command string
+		std::string cmd_step = ss.str();									//store the move command in a string
+
+		ss.clear();
+		float zpass = dz * grabs;											//calculate the length of an entire imaging pass
+		ss << "LINEAR Z-" << zpass;											//generate the stage return command
+		std::string cmd_return = ss.str();									//store in a string
+
+		for (int i = 0; i < grabs; i++){
+			
+			
+			A3200CommandExecute(hstage, TASKID_01, cmd_step.c_str(), &result_stage);		//move the stage
+			//A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);		//wait
+			CreateDisplayImageExample(hcam, i, fpg);											//capture images		 
+
+			rtsProgressBar((float)(i + 1) / (float)grabs * 100);
+			//std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;				//display the number of images
+
+			//A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);		//wait again
+		}
+		A3200CommandExecute(hstage, TASKID_01, cmd_return.c_str(), &result_stage);				//move stage back to origin
 	}
-	A3200CommandExecute(hstage, TASKID_01, cmd_return.c_str(), &result_stage);				//move stage back to origin
+
+
 
 	aerotechCleanup(hstage);																//shut down the stage
 }
