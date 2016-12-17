@@ -16,6 +16,8 @@
 #include <stim/parser/arguments.h>
 #include <sstream>
 #include <stim/ui/progressbar.h>
+#include <direct.h>
+#include <errno.h>
 
 const int fpa_size = 128;
 int fpg = 1;				//number of frames per grab
@@ -123,7 +125,7 @@ void SaveGrayScalePGM(uint16_t * p_pixel_data, int width, int height, const std:
   ofile.close();
 } 
 
-void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fpg)
+void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fpg, std::string dest_sub_path)
 {
 	uint32_t frame_width = 128;
 	uint32_t frame_height = 128;
@@ -196,7 +198,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
     SaveGrayScalePGM( p_display_image,
                       frame_width,
                       frame_height,
-                      GetPGMFileName(dest_path, "sbf161_img", grab_index, frame_index+1));
+                      GetPGMFileName(dest_sub_path, "sbf161_img", grab_index, frame_index+1));
   }
 
   // Stop acquiring frames
@@ -246,8 +248,10 @@ int main(int argc, char* argv[]) {
 	}
 
 	if(args.nargs() > 0) dest_path = args.arg(0);						//get the destination path (if specified)
+	std::cout<<"\t\t=====>> dest_path "<<dest_path<<std::endl;
+
 	if(dest_path.back() != '\\' || dest_path.back() != '/')
-		dest_path += "/";
+		dest_path += "\\";
 
 	DOUBLE result_stage;										//return value used by Aerotech stage control
 
@@ -318,9 +322,9 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-		//
+		
 		//wait until laser cool down to do tuning
-		//
+		
 		printf( "********************************************************\n");
 		printf( "Cooling down Laser ... \n" );
 		printf( "********************************************************\n");
@@ -365,15 +369,23 @@ int main(int argc, char* argv[]) {
 	//
 	//imaging
 	//
+		//int mkdirFlag = mkdir(dest_path.c_str());
+		//	if (mkdirFlag != 0){
+		//		printf ("Error : %s\n", strerror(errno));
+		//	}
 
-	for (int wn_index = 0; wn_index <= 40; wn_index++){
+		for (int wn_index = 0; wn_index <= 40; wn_index++){
 
 		//tuning laser
 
 		std::stringstream sub_dir;												//create an empty string stream
 		int wn = 1400 + wn_index * 8;										//get the sub folder for saving different wn images
-		sub_dir << dest_path << wn;												//append to the parent dir string
-		std::string dest_path = sub_dir.str();	
+		sub_dir << dest_path << wn << "\\";												//append to the parent dir string
+		std::string dest_sub_path = sub_dir.str();
+		int mkdirFlag = mkdir(dest_sub_path.c_str());
+		if (mkdirFlag != 0){
+			printf ("Error : %s\n", strerror(errno));
+		}
 
 		printf( "========================================================\n");
         std::cout << "Tuning to WN :" << wn << std::endl;
@@ -410,27 +422,30 @@ int main(int argc, char* argv[]) {
 		ss << "LINEAR Z"<<dz;												//append to the command string
 		std::string cmd_step = ss.str();									//store the move command in a string
 
-		ss.clear();
+		std::stringstream bb;
 		float zpass = dz * grabs;											//calculate the length of an entire imaging pass
-		ss << "LINEAR Z-" << zpass;											//generate the stage return command
-		std::string cmd_return = ss.str();									//store in a string
+		bb << "LINEAR Z-" << zpass;											//generate the stage return command
+		std::string cmd_return = bb.str();									//store in a string
 
 		for (int i = 0; i < grabs; i++){
 			
 			
 			A3200CommandExecute(hstage, TASKID_01, cmd_step.c_str(), &result_stage);		//move the stage
-			//A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);		//wait
-			CreateDisplayImageExample(hcam, i, fpg);											//capture images		 
+			A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 200", &result_stage);		//wait
+			CreateDisplayImageExample(hcam, i, fpg, dest_sub_path);											//capture images		 
 
 			rtsProgressBar((float)(i + 1) / (float)grabs * 100);
 			//std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;				//display the number of images
 
-			//A3200CommandExecute(handle, TASKID_01, "MOVEDELAY Z, 1000", &result_stage);		//wait again
+			A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 100", &result_stage);		//wait again
 		}
 		A3200CommandExecute(hstage, TASKID_01, cmd_return.c_str(), &result_stage);				//move stage back to origin
+//		A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 2000", &result_stage);		//wait again
 	}
 
-
+    if(!(MIRcatSDK_TurnEmissionOff())){
+        std::cout << "Laser Emission off." << std::endl;
+    }
 
 	aerotechCleanup(hstage);																//shut down the stage
 }
