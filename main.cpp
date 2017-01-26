@@ -20,7 +20,7 @@
 #include <errno.h>
 
 const int fpa_size = 128;
-int fpg = 1;				//number of frames per grab
+int fpg = 1600;				//number of frames per grab
 
 A3200Handle hstage = NULL;	//handle for the stage controller
 
@@ -105,7 +105,7 @@ std::string GetPGMFileName(const std::string &  parent_directory,
                       int frame_index)
 {
   std::stringstream ss;
-  ss << parent_directory << base_file_name << "_" <<grab_index<<"_"<< frame_index << ".pgm";
+  ss << parent_directory << base_file_name << "_" <<grab_index<<"_"<< frame_index << ".txt";
   return ss.str();
 }
 
@@ -116,7 +116,7 @@ std::string GetPGMFileName(const std::string &  parent_directory,
 void SaveGrayScalePGM(uint16_t * p_pixel_data, int width, int height, const std::string pgm_path) 
 { 
   std::ofstream ofile(pgm_path, std::ios::out|std::ios::ate);
-  ofile << "P2\n" << width << " " << height << "\n16383\n";
+  //ofile << "P2\n" << width << " " << height << "\n16383\n";
   int num_pixels = width*height;
   for (int i = 0; i < num_pixels; i++)
   {
@@ -238,7 +238,7 @@ int main(int argc, char* argv[]) {
 
 	stim::arglist args;
 	args.add("help", "prints usage information");
-	args.add("grabs", "total number of images to collect", "500", "integer (currently between 1 and 500)");
+	args.add("grabs", "total number of images to collect", "1", "integer (currently between 1 and 500)");
 	args.add("zstep", "number of micrometers between images", "5", "positive value describing stage motion in microns");
 	args.parse(argc, argv);
 
@@ -374,12 +374,12 @@ int main(int argc, char* argv[]) {
 		//		printf ("Error : %s\n", strerror(errno));
 		//	}
 
-		for (int wn_index = 0; wn_index <= 40; wn_index++){
+		for (int wn_index = 1; wn_index <= 30; wn_index++){
 
 		//tuning laser
 
 		std::stringstream sub_dir;												//create an empty string stream
-		int wn = 1400 + wn_index * 8;										//get the sub folder for saving different wn images
+		int wn = 1570 + wn_index * 2;										//get the sub folder for saving different wn images
 		sub_dir << dest_path << wn << "\\";												//append to the parent dir string
 		std::string dest_sub_path = sub_dir.str();
 		int mkdirFlag = mkdir(dest_sub_path.c_str());
@@ -389,7 +389,7 @@ int main(int argc, char* argv[]) {
 
 		printf( "========================================================\n");
         std::cout << "Tuning to WN :" << wn << std::endl;
-        if(!(MIRcatSDK_TuneToWW(wn, MIRcatSDK_UNITS_CM1, 0))){
+        if(!(MIRcatSDK_TuneToWW(wn, MIRcatSDK_UNITS_CM1, 2))){
 
         	bool isTuned = false;
 	        while(!isTuned)
