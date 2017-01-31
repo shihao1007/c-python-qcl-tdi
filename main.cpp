@@ -18,6 +18,8 @@
 #include <stim/ui/progressbar.h>
 #include <direct.h>
 #include <errno.h>
+#include <cstdio>
+#include <ctime>
 
 const int fpa_size = 128;
 int fpg = 1600;				//number of frames per grab
@@ -131,6 +133,15 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 	uint32_t frame_height = 128;
 	int bytes_per_pixel = 2;
 	int frame_data_size = frame_width * frame_height * bytes_per_pixel;
+	std::clock_t start_grabbing;
+	std::clock_t start_decommute;
+	std::clock_t start_saving_singleframe;
+	std::clock_t start_saving;
+	double duration_grabbing;
+	double duration_decommute;
+	double duration_saving_singleframe;
+	double duration_saving;
+
 
 	// Configure the frame acquisition window size
 	CHECK_IPS(IPS_SetFrameWindow( handle_ips, 
@@ -141,11 +152,15 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 
 	// Start capturing a block of fpg frames
 	tsi::ips::VMemory<uint8_t> buffer(frame_data_size*fpg);
+
+	start_grabbing = std::clock();
 	CHECK_IPS(IPS_StartGrabbing( handle_ips,         
 								fpg,            // Capture Fra_Number frames then stop capturing
 								buffer.data(), // User allocated buffer
 								buffer.size(), // size of user allocated buffer
 								false));        // No wrap
+
+
 
 	// Wait for all frames to be acquired
 	uint64_t frame_number;
@@ -156,6 +171,9 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 								false,                       // Pause after WaitFrame returns
 								&p_frame,                    // Return a pointer to the frame
 								&frame_number));              // Return the frame number of the returned frame
+	
+	duration_grabbing = ( std::clock() - start_grabbing ) / (double) CLOCKS_PER_SEC;
+	std::cout << "\nDuration for acquiring "<< fpg << " frames: " << duration_grabbing << " seconds"<< std::endl ;
 
 
   // *********** Decommute ********************
@@ -165,44 +183,52 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
   // in the second column and so on to the last column.  Then it continues to rows 5-8 and so on.
 
   // Create a decommute table for recording the pixels for display as an image
-  std::vector<int> decommute_table(frame_width*frame_height);
-  Initialize_SBF161_Decommute_Table(frame_width * 4,
-                                    frame_height/4,
-                                    frame_width,
-                                    frame_height,
-                                    decommute_table);
+	start_saving = std::clock();
+	std::vector<int> decommute_table(frame_width*frame_height);
+	Initialize_SBF161_Decommute_Table(frame_width * 4,
+									frame_height/4,
+									frame_width,
+									frame_height,
+									decommute_table);
 
-  // Decommute the images.
-  std::vector<uint16_t> display_image(frame_width * frame_height);
-  //std::string module_dir = GetModuleDirectory();
-  //std::string image_dir = module_dir + "\Frames1800\\";
+	// Decommute the images.
+	std::vector<uint16_t> display_image(frame_width * frame_height);
+	//std::string module_dir = GetModuleDirectory();
+	//std::string image_dir = module_dir + "\Frames1800\\";
 
-  for (int frame_index = 0; frame_index < frame_number; frame_index++)
-  {
-    // Get a pointer to the image
-    uint16_t * p_image = (uint16_t* ) (buffer.data() + frame_index*frame_data_size);
+	for (int frame_index = 0; frame_index < frame_number; frame_index++)
+	{
+		// Get a pointer to the image
+		uint16_t * p_image = (uint16_t* ) (buffer.data() + frame_index*frame_data_size);
 
-    // Decommute the image
-    for (unsigned i = 0; i < display_image.size(); i++)
-    {
-      display_image[i] = p_image[decommute_table[i]];
+		// Decommute the image
+		start_decommute = std::clock();
+		for (unsigned i = 0; i < display_image.size(); i++)
+		{
+			display_image[i] = p_image[decommute_table[i]];
 
-      // Invert the image pixel 
-	  // uncomment the following line to invert the image
-      display_image[i] = display_image[i] ^ 0x3FFF;
-    }
-
-    uint16_t * p_display_image = display_image.data();
-
-    // Save as PGM image
-    SaveGrayScalePGM( p_display_image,
-                      frame_width,
-                      frame_height,
-                      GetPGMFileName(dest_sub_path, "sbf161_img", grab_index, frame_index+1));
+			// Invert the image pixel 
+			// uncomment the following line to invert the image
+			display_image[i] = display_image[i] ^ 0x3FFF;
+		}
+		duration_decommute = ( std::clock() - start_decommute ) / (double) CLOCKS_PER_SEC;
+		std::cout << "\nDuration for decommute 1 frame: " << duration_decommute << " seconds"<< std::endl ;
+		uint16_t * p_display_image = display_image.data();
+		
+		start_saving_singleframe = std::clock();
+		// Save as txt file
+		SaveGrayScalePGM( p_display_image,
+						  frame_width,
+						  frame_height,
+						  GetPGMFileName(dest_sub_path, "sbf161_img", grab_index, frame_index+1));
+		duration_saving_singleframe = ( std::clock() - start_saving_singleframe ) / (double) CLOCKS_PER_SEC;
+		std::cout << "\nDuration for saving 1 frame: " << duration_saving_singleframe << " seconds"<< std::endl ;
   }
 
   // Stop acquiring frames
-  CHECK_IPS(IPS_StopGrabbing(handle_ips));
+	CHECK_IPS(IPS_StopGrabbing(handle_ips));
+	duration_saving = ( std::clock() - start_saving ) / (double) CLOCKS_PER_SEC;
+	std::cout << "\nDuration for saving "<< fpg << " frames: " << duration_saving << " seconds"<< std::endl ;
 }
 
 void ipsPrintDiagnostics(HANDLE_IPS_ACQ handle) {
@@ -252,6 +278,10 @@ int main(int argc, char* argv[]) {
 
 	if(dest_path.back() != '\\' || dest_path.back() != '/')
 		dest_path += "\\";
+
+
+
+
 
 	DOUBLE result_stage;										//return value used by Aerotech stage control
 
@@ -432,9 +462,13 @@ int main(int argc, char* argv[]) {
 			
 			A3200CommandExecute(hstage, TASKID_01, cmd_step.c_str(), &result_stage);		//move the stage
 			A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 200", &result_stage);		//wait
+			
+			
 			CreateDisplayImageExample(hcam, i, fpg, dest_sub_path);											//capture images		 
 
+
 			rtsProgressBar((float)(i + 1) / (float)grabs * 100);
+
 			//std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;				//display the number of images
 
 			A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 100", &result_stage);		//wait again
