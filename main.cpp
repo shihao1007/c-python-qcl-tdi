@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <iterator>
 #include <functional>
+#include <chrono>
 
 const int fpa_size = 128;
 int fpg = 1600;				//number of frames per grab
@@ -158,7 +159,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 	double duration_saving_singleframe;
 	double duration_saving;
 
-
+	std::chrono::high_resolution_clock::time_point t0 = std::chrono::high_resolution_clock::now();
 	// Configure the frame acquisition window size
 	CHECK_IPS(IPS_SetFrameWindow( handle_ips, 
 								0,
@@ -168,7 +169,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 
 	// Start capturing a block of fpg frames
 	tsi::ips::VMemory<uint8_t> buffer(frame_data_size*fpg);
-
+	std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 	start_grabbing = std::clock();
 	CHECK_IPS(IPS_StartGrabbing( handle_ips,         
 								fpg,            // Capture Fra_Number frames then stop capturing
@@ -177,7 +178,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 								false));        // No wrap
 
 
-
+	std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
 	// Wait for all frames to be acquired
 	uint64_t frame_number;
 	uint8_t * p_frame = NULL;
@@ -187,7 +188,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 								false,                       // Pause after WaitFrame returns
 								&p_frame,                    // Return a pointer to the frame
 								&frame_number));              // Return the frame number of the returned frame
-	
+	std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
 	duration_grabbing = ( std::clock() - start_grabbing ) / (double) CLOCKS_PER_SEC;
 	std::cout << "\nDuration for acquiring "<< fpg << " frames: " << duration_grabbing << " seconds"<< std::endl ;
 
@@ -199,21 +200,21 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
   // in the second column and so on to the last column.  Then it continues to rows 5-8 and so on.
 
   // Create a decommute table for recording the pixels for display as an image
-	start_saving = std::clock();
+	
 	std::vector<int> decommute_table(frame_width*frame_height);
 	Initialize_SBF161_Decommute_Table(frame_width * 4,
 									frame_height/4,
 									frame_width,
 									frame_height,
 									decommute_table);
-
+	std::chrono::high_resolution_clock::time_point t4 = std::chrono::high_resolution_clock::now();
 	// Decommute the images.
 	std::vector<uint16_t> display_image(frame_width * frame_height);
 	std::vector<uint16_t> display_image_all(frame_width * frame_height, 0);
 	uint16_t * p_display_image;
 	//std::string module_dir = GetModuleDirectory();
 	//std::string image_dir = module_dir + "\Frames1800\\";
-
+	
 	for (int frame_index = 0; frame_index < frame_number; frame_index++)
 	{
 		// Get a pointer to the image
@@ -231,13 +232,14 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 		}
 
 		std::transform ( display_image_all.begin(), display_image_all.end(), display_image.begin(), display_image_all.begin(), std::plus<uint16_t>());
-		duration_decommute = ( std::clock() - start_decommute ) / (double) CLOCKS_PER_SEC;
-		std::cout << "\nDuration for decommute 1 frame: " << duration_decommute << " seconds"<< std::endl ;
+		//duration_decommute = ( std::clock() - start_decommute ) / (double) CLOCKS_PER_SEC;
+		//std::cout << "\nDuration for decommute 1 frame: " << duration_decommute << " seconds"<< std::endl ;
 		p_display_image = display_image_all.data();
 		
   }
+	std::chrono::high_resolution_clock::time_point t5 = std::chrono::high_resolution_clock::now();
 	
-	start_saving_singleframe = std::clock();
+	//start_saving_singleframe = std::clock();
 	// Save as txt file
 	/*SaveGrayScalePGM( p_display_image,
 						frame_width,
@@ -247,12 +249,17 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 	const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img", grab_index, 1600);
 	WriteArray(TXTfilename.c_str(), p_display_image, frame_height*frame_width);
 
-	duration_saving_singleframe = ( std::clock() - start_saving_singleframe ) / (double) CLOCKS_PER_SEC;
-	std::cout << "\nDuration for saving 1 frame: " << duration_saving_singleframe << " seconds"<< std::endl ;
+	std::chrono::high_resolution_clock::time_point t6 = std::chrono::high_resolution_clock::now();
+	//duration_saving_singleframe = ( std::clock() - start_saving_singleframe ) / (double) CLOCKS_PER_SEC;
+	//std::cout << "\nDuration for saving 1 frame: " << duration_saving_singleframe << " seconds"<< std::endl ;
   // Stop acquiring frames
 	CHECK_IPS(IPS_StopGrabbing(handle_ips));
-	duration_saving = ( std::clock() - start_saving ) / (double) CLOCKS_PER_SEC;
-	std::cout << "\nDuration for saving "<< fpg << " frames: " << duration_saving << " seconds"<< std::endl ;
+	//duration_saving = ( std::clock() - start_saving ) / (double) CLOCKS_PER_SEC;
+	//std::cout << "\nDuration for saving "<< fpg << " frames: " << duration_saving << " seconds"<< std::endl ;
+
+	std::cout << "total time: " << std::chrono::duration_cast<std::chrono::duration<double>>(t6 - t0).count();
+	//std::cout << "total time: " << std::chrono::duration_cast<std::chrono::duration<double>>(t4 - t0).count();
+
 }
 
 void ipsPrintDiagnostics(HANDLE_IPS_ACQ handle) {
