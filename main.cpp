@@ -20,6 +20,9 @@
 #include <errno.h>
 #include <cstdio>
 #include <ctime>
+#include <algorithm>
+#include <iterator>
+#include <functional>
 
 const int fpa_size = 128;
 int fpg = 1600;				//number of frames per grab
@@ -127,6 +130,19 @@ void SaveGrayScalePGM(uint16_t * p_pixel_data, int width, int height, const std:
   ofile.close();
 } 
 
+void WriteArray(const char *filename, uint16_t *data, size_t size) {
+	FILE *fp;
+	//open file for output
+	fp = fopen(filename, "wb");
+	if (!fp) {
+		fprintf(stderr, "Unable to open file '%s'\n", filename);
+		exit(1);
+	}
+
+	fwrite(data, sizeof(uint16_t), size, fp);
+	fclose(fp);
+}
+
 void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fpg, std::string dest_sub_path)
 {
 	uint32_t frame_width = 128;
@@ -193,6 +209,8 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 
 	// Decommute the images.
 	std::vector<uint16_t> display_image(frame_width * frame_height);
+	std::vector<uint16_t> display_image_all(frame_width * frame_height, 0);
+	uint16_t * p_display_image;
 	//std::string module_dir = GetModuleDirectory();
 	//std::string image_dir = module_dir + "\Frames1800\\";
 
@@ -211,20 +229,26 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 			// uncomment the following line to invert the image
 			display_image[i] = display_image[i] ^ 0x3FFF;
 		}
+
+		std::transform ( display_image_all.begin(), display_image_all.end(), display_image.begin(), display_image_all.begin(), std::plus<uint16_t>());
 		duration_decommute = ( std::clock() - start_decommute ) / (double) CLOCKS_PER_SEC;
 		std::cout << "\nDuration for decommute 1 frame: " << duration_decommute << " seconds"<< std::endl ;
-		uint16_t * p_display_image = display_image.data();
+		p_display_image = display_image_all.data();
 		
-		start_saving_singleframe = std::clock();
-		// Save as txt file
-		SaveGrayScalePGM( p_display_image,
-						  frame_width,
-						  frame_height,
-						  GetPGMFileName(dest_sub_path, "sbf161_img", grab_index, frame_index+1));
-		duration_saving_singleframe = ( std::clock() - start_saving_singleframe ) / (double) CLOCKS_PER_SEC;
-		std::cout << "\nDuration for saving 1 frame: " << duration_saving_singleframe << " seconds"<< std::endl ;
   }
+	
+	start_saving_singleframe = std::clock();
+	// Save as txt file
+	/*SaveGrayScalePGM( p_display_image,
+						frame_width,
+						frame_height,
+						GetPGMFileName(dest_sub_path, "sbf161_img", grab_index, 1600));*/
 
+	const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img", grab_index, 1600);
+	WriteArray(TXTfilename.c_str(), p_display_image, frame_height*frame_width);
+
+	duration_saving_singleframe = ( std::clock() - start_saving_singleframe ) / (double) CLOCKS_PER_SEC;
+	std::cout << "\nDuration for saving 1 frame: " << duration_saving_singleframe << " seconds"<< std::endl ;
   // Stop acquiring frames
 	CHECK_IPS(IPS_StopGrabbing(handle_ips));
 	duration_saving = ( std::clock() - start_saving ) / (double) CLOCKS_PER_SEC;

@@ -5,19 +5,19 @@
 
 %% read images then averaging and cut into smaller part if necessary
 
-grabs = 500;                                                                 % total grabs in different position of the sample plane                                                                % images acquired during the same grab
-frames = 1;
+grabs = 200;                                                                 % total grabs in different position of the sample plane                                                                % images acquired during the same grab
+frames = 20;
 cut_X_min = 0;
 cut_X_max = 128;
-cut_Y_min = 15;
-cut_Y_max = 120;
+cut_Y_min = 0;
+cut_Y_max = 128;
 %define the curtain size
 c = 2;
 
 
-for i = 0 : 40
-    k = 400+(i)*8;
-    dataDIR = sprintf('D:\\ir images\\IR Images\\ir-brest-1400-1720\\1%d', k);
+for i = 1 : 81
+    k = 500+(i)*2;
+    dataDIR = sprintf('D:\\ir images\\IR Images\\ir-target-1500-1700-2cm-1\\1%d', k);
     
     for j= 0 : grabs - 1   % during each grab                
         for f = 1 : frames
@@ -51,9 +51,10 @@ for i = 0 : 40
     
     I_crop = I(Y+20:size(I,1)-Y-20,:);
 
-    background = repmat(I_crop(50,:), [size(I_crop,1), 1]);
-    I_ratio(:,:) = - log( I_crop(:,:) ./ background);
+    background_i = repmat(I_crop(50,:), [size(I_crop,1), 1]);
+    I_ratio(:,:) = - log( I_crop(:,:) ./ background_i);
     
+    I_background(:,:,i+1) = background_i;
     I_before_ratio(:,:,i+1) = I_crop(:,:);
     I_spectral(:,:,i+1) = I_ratio(:,:);
     
@@ -71,7 +72,7 @@ fid = fopen('A','w');
 fwrite(fid, A, 'float32');
 fclose(fid);
 
-I0 = rot90(I_crop(50,:));
+I0 = rot90(I_background);
 fid = fopen('I0','w');
 fwrite(fid, I0, 'float32');
 fclose(fid);
