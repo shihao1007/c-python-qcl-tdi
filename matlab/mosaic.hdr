@@ -1,0 +1,18 @@
+ENVI
+description = {
+  ChemVision File, File Name [RegionL[-4886_-13321][17_00_31]], Created [Fri Sep 9 17:00:26 2016]}
+samples = 128
+lines = 128
+bands = 30
+header offset = 0
+file type = Spero Chemvision
+data type = 4
+interleave = bsq
+sensor type = Daylight Solutions Spero
+byte order = 0
+x start = 0
+y start = 0
+wavelength units = cm-1
+z plot titles = {Unknown, Unknown}
+pixel size = {1, 1, units=Meters}
+wavelength = {1572,1574,1576,1578,1580,1582,1584,1586,1588,1590,1592,1594,1596,1598,1600,1602,1604,1606,1608,1610,1612,1614,1616,1618,1620,1622,1624,1626,1628,1630}
