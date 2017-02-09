@@ -18,15 +18,12 @@
 #include <stim/ui/progressbar.h>
 #include <direct.h>
 #include <errno.h>
-#include <cstdio>
-#include <ctime>
-#include <algorithm>
-#include <iterator>
-#include <functional>
-#include <chrono>
+#include <math.h>
 
+
+#define PI 3.14159265
 const int fpa_size = 128;
-int fpg = 4800;				//number of frames per grab
+int fpg = 1;				//number of frames per grab
 
 A3200Handle hstage = NULL;	//handle for the stage controller
 
@@ -105,19 +102,48 @@ void Initialize_SBF161_Decommute_Table( int grab_num_cols,
 	}
 }
 
-std::string GetPGMFileName(const std::string &  parent_directory,
+//save raw data
+void SaveData(	const std::string &  parent_directory,
+				const std::string & base_file_name,
+				int grab_index,
+				int frame_index,
+				uint16_t * p_pixel_data, 
+				int width, 
+				int height, 
+				const char * pgm_path)
+{
+	std::stringstream ss;
+	ss << parent_directory << base_file_name << "_" <<grab_index<<"_"<< frame_index << ".r";
+	const std::string tmp = ss.str();
+	const char* cstr = tmp.c_str();
+	FILE *fid = fopen (cstr, "wb");
+	fwrite ( p_pixel_data, sizeof(uint16_t), sizeof(p_pixel_data), fid);
+	fclose(fid);
+}
+
+const std::string GetPGMFileName(const std::string &  parent_directory,
                       const std::string & base_file_name,
 					  int grab_index,
                       int frame_index)
 {
   std::stringstream ss;
-  ss << parent_directory << base_file_name << "_" <<grab_index<<"_"<< frame_index << ".bin";
-  return ss.str();
+  ss << parent_directory << base_file_name << "_" <<grab_index<<"_"<< frame_index << ".txt";
+  const std::string tmp = ss.str();
+
+  return tmp;
 }
 
 
 // Saves a 16 bpp grayscale image to PGM encoded file.  
 //  IrfanView can be used to display PGM images. http://www.irfanview.com/
+
+void SaveRawData(uint16_t * p_pixel_data, int width, int height, const char * pgm_path) 
+{ 
+   FILE *fid = fopen (pgm_path, "wb");
+   fwrite ( p_pixel_data, sizeof(uint16_t), 16384, fid);
+   fclose(fid);
+
+}
 
 void SaveGrayScalePGM(uint16_t * p_pixel_data, int width, int height, const std::string pgm_path) 
 { 
@@ -126,23 +152,10 @@ void SaveGrayScalePGM(uint16_t * p_pixel_data, int width, int height, const std:
   int num_pixels = width*height;
   for (int i = 0; i < num_pixels; i++)
   {
-    ofile << p_pixel_data[i] << " ";
+    ofile << p_pixel_data[i] << ",";
   }
   ofile.close();
 } 
-
-void WriteArray(const char *filename, uint32_t *data, size_t size) {
-	FILE *fp;
-	//open file for output
-	fp = fopen(filename, "wb");
-	if (!fp) {
-		fprintf(stderr, "Unable to open file '%s'\n", filename);
-		exit(1);
-	}
-
-	fwrite(data, sizeof(uint32_t), size, fp);
-	fclose(fp);
-}
 
 void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fpg, std::string dest_sub_path)
 {
@@ -150,16 +163,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 	uint32_t frame_height = 128;
 	int bytes_per_pixel = 2;
 	int frame_data_size = frame_width * frame_height * bytes_per_pixel;
-	std::clock_t start_grabbing;
-	std::clock_t start_decommute;
-	std::clock_t start_saving_singleframe;
-	std::clock_t start_saving;
-	double duration_grabbing;
-	double duration_decommute;
-	double duration_saving_singleframe;
-	double duration_saving;
 
-	std::chrono::high_resolution_clock::time_point t0 = std::chrono::high_resolution_clock::now();
 	// Configure the frame acquisition window size
 	CHECK_IPS(IPS_SetFrameWindow( handle_ips, 
 								0,
@@ -169,16 +173,12 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 
 	// Start capturing a block of fpg frames
 	tsi::ips::VMemory<uint8_t> buffer(frame_data_size*fpg);
-	std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-	start_grabbing = std::clock();
 	CHECK_IPS(IPS_StartGrabbing( handle_ips,         
 								fpg,            // Capture Fra_Number frames then stop capturing
 								buffer.data(), // User allocated buffer
 								buffer.size(), // size of user allocated buffer
 								false));        // No wrap
 
-
-	std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
 	// Wait for all frames to be acquired
 	uint64_t frame_number;
 	uint8_t * p_frame = NULL;
@@ -188,9 +188,6 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 								false,                       // Pause after WaitFrame returns
 								&p_frame,                    // Return a pointer to the frame
 								&frame_number));              // Return the frame number of the returned frame
-	std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
-	duration_grabbing = ( std::clock() - start_grabbing ) / (double) CLOCKS_PER_SEC;
-	std::cout << "\nDuration for acquiring "<< fpg << " frames: " << duration_grabbing << " seconds"<< std::endl ;
 
 
   // *********** Decommute ********************
@@ -200,68 +197,56 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
   // in the second column and so on to the last column.  Then it continues to rows 5-8 and so on.
 
   // Create a decommute table for recording the pixels for display as an image
-	
-	std::vector<int> decommute_table(frame_width*frame_height);
-	Initialize_SBF161_Decommute_Table(frame_width * 4,
-									frame_height/4,
-									frame_width,
-									frame_height,
-									decommute_table);
-	std::chrono::high_resolution_clock::time_point t4 = std::chrono::high_resolution_clock::now();
-	// Decommute the images.
-	std::vector<uint16_t> display_image(frame_width * frame_height);
-	std::vector<uint32_t> display_image_all(frame_width * frame_height, 0);
-	uint32_t * p_display_image;
-	//std::string module_dir = GetModuleDirectory();
-	//std::string image_dir = module_dir + "\Frames1800\\";
-	
-	for (int frame_index = 0; frame_index < frame_number; frame_index++)
-	{
-		// Get a pointer to the image
-		uint16_t * p_image = (uint16_t* ) (buffer.data() + frame_index*frame_data_size);
+  std::vector<int> decommute_table(frame_width*frame_height);
+  Initialize_SBF161_Decommute_Table(frame_width * 4,
+                                    frame_height/4,
+                                    frame_width,
+                                    frame_height,
+                                    decommute_table);
 
-		// Decommute the image
-		start_decommute = std::clock();
-		for (unsigned i = 0; i < display_image.size(); i++)
-		{
-			display_image[i] = p_image[decommute_table[i]];
+  // Decommute the images.
+  std::vector<uint16_t> display_image(frame_width * frame_height);
+  //std::string module_dir = GetModuleDirectory();
+  //std::string image_dir = module_dir + "\Frames1800\\";
 
-			// Invert the image pixel 
-			// uncomment the following line to invert the image
-			display_image[i] = display_image[i] ^ 0x3FFF;
-		}
+  for (int frame_index = 0; frame_index < frame_number; frame_index++)
+  {
+    // Get a pointer to the image
+    uint16_t * p_image = (uint16_t* ) (buffer.data() + frame_index*frame_data_size);
 
-		std::transform ( display_image_all.begin(), display_image_all.end(), display_image.begin(), display_image_all.begin(), std::plus<uint32_t>());
-		
-	}
-	//std::transform( display_image_all.begin(), display_image_all.end(), display_image_all.begin(), std::bind2nd(std::multiplies<uint32_t>(), 0.000625));
-	//duration_decommute = ( std::clock() - start_decommute ) / (double) CLOCKS_PER_SEC;
-	//std::cout << "\nDuration for decommute 1 frame: " << duration_decommute << " seconds"<< std::endl ;
-	p_display_image = display_image_all.data();
-	std::chrono::high_resolution_clock::time_point t5 = std::chrono::high_resolution_clock::now();
-	
-	//start_saving_singleframe = std::clock();
-	// Save as txt file
-	/*SaveGrayScalePGM( p_display_image,
-						frame_width,
-						frame_height,
-						GetPGMFileName(dest_sub_path, "sbf161_img", grab_index, 1600));*/
+    // Decommute the image
+    for (unsigned i = 0; i < display_image.size(); i++)
+    {
+      display_image[i] = p_image[decommute_table[i]];
 
-	const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img", grab_index, 1600);
-	WriteArray(TXTfilename.c_str(), p_display_image, frame_height*frame_width);
+      // Invert the image pixel 
+	  // uncomment the following line to invert the image
+      display_image[i] = display_image[i] ^ 0x3FFF;
+    }
 
-	std::chrono::high_resolution_clock::time_point t6 = std::chrono::high_resolution_clock::now();
-	//duration_saving_singleframe = ( std::clock() - start_saving_singleframe ) / (double) CLOCKS_PER_SEC;
-	//std::cout << "\nDuration for saving 1 frame: " << duration_saving_singleframe << " seconds"<< std::endl ;
+    uint16_t * p_display_image = display_image.data();
+	const std::string fileName =  GetPGMFileName(dest_sub_path, "sbf161_img", grab_index, frame_index+1);
+	/*
+	SaveData(dest_sub_path, "sbf161_img", grab_index, frame_index+1,
+					  p_display_image,
+                      frame_width,
+                      frame_height,
+                      fileName);
+					  */
+    // Save as PGM image
+    /*SaveRawData( p_display_image,
+                      frame_width,
+                      frame_height,
+                      fileName.c_str());
+  }*/
+
+      SaveGrayScalePGM( p_display_image,
+                      frame_width,
+                      frame_height,
+                      GetPGMFileName(dest_sub_path, "sbf161_img", grab_index, frame_index+1));
+  }
   // Stop acquiring frames
-	CHECK_IPS(IPS_StopGrabbing(handle_ips));
-	//duration_saving = ( std::clock() - start_saving ) / (double) CLOCKS_PER_SEC;
-	//std::cout << "\nDuration for saving "<< fpg << " frames: " << duration_saving << " seconds"<< std::endl ;
-
-	std::cout << "total time: " << std::chrono::duration_cast<std::chrono::duration<double>>(t6 - t0).count()<<std::endl;
-	std::cout << "acquire:    " << std::chrono::duration_cast<std::chrono::duration<double>>(t3 - t1).count()<<std::endl;
-	//std::cout << "total time: " << std::chrono::duration_cast<std::chrono::duration<double>>(t4 - t0).count();
-
+  CHECK_IPS(IPS_StopGrabbing(handle_ips));
 }
 
 void ipsPrintDiagnostics(HANDLE_IPS_ACQ handle) {
@@ -311,10 +296,6 @@ int main(int argc, char* argv[]) {
 
 	if(dest_path.back() != '\\' || dest_path.back() != '/')
 		dest_path += "\\";
-
-
-
-
 
 	DOUBLE result_stage;										//return value used by Aerotech stage control
 
@@ -437,12 +418,12 @@ int main(int argc, char* argv[]) {
 		//		printf ("Error : %s\n", strerror(errno));
 		//	}
 
-		for (int wn_index = 1; wn_index <= 200; wn_index++){
+		for (int wn_index = 1; wn_index <= 500; wn_index++){
 
 		//tuning laser
 
 		std::stringstream sub_dir;												//create an empty string stream
-		int wn = 1400 + wn_index * 2;										//get the sub folder for saving different wn images
+		int wn = 910 + wn_index * 2;										//get the sub folder for saving different wn images
 		sub_dir << dest_path << wn << "\\";												//append to the parent dir string
 		std::string dest_sub_path = sub_dir.str();
 		int mkdirFlag = mkdir(dest_sub_path.c_str());
@@ -450,23 +431,119 @@ int main(int argc, char* argv[]) {
 			printf ("Error : %s\n", strerror(errno));
 		}
 
-		printf( "========================================================\n");
-        std::cout << "Tuning to WN :" << wn << std::endl;
-        if(!(MIRcatSDK_TuneToWW(wn, MIRcatSDK_UNITS_CM1, 0))){
 
-        	bool isTuned = false;
-	        while(!isTuned)
-	        {
-	            ret = MIRcatSDK_IsTuned(&isTuned);
-	            ::Sleep(500);
+
+		if ( wn >= 910 && wn <= 1170){
+			printf( "========================================================\n");							//for QCL 4 
+	        std::cout << "Tuning to WN :" << wn << std::endl;
+
+	        float fCurrentInMilliAmps = 1400 * (0.1 * ( sin ( (2 * PI * wn_index )/500 + PI)) + 0.9 ) ;     //calculate corresponding current for each wave number
+
+	        if(!(MIRcatSDK_TuneToWW(wn, MIRcatSDK_UNITS_CM1, 4))){											//tuning to wn
+
+	        	bool isTuned = false;
+		        while(!isTuned)
+		        {
+		            ret = MIRcatSDK_IsTuned(&isTuned);
+		            ::Sleep(500);
+		        }
+
+	        	std::cout << "Tuned to " << wn << std::endl;
+	        }																								//wait until finish tuning
+
+			if(!(MIRcatSDK_SetQCLParams( 4, 100000, 500, fCurrentInMilliAmps))){
+	        	std::cout << "Set Laser Current to " << fCurrentInMilliAmps << std::endl;					//set laser current 
 	        }
 
-        	std::cout << "Tuned to " << wn << std::endl;
-        }
+	        if(!(MIRcatSDK_TurnEmissionOn())){
+	        	std::cout << "Laser Emission on." << std::endl;
+	        }
+		}	
 
-        if(!(MIRcatSDK_TurnEmissionOn())){
-        	std::cout << "Laser Emission on." << std::endl;
-        }
+
+		if ( wn >= 1172 && wn <= 1420){
+			printf( "========================================================\n");
+	        std::cout << "Tuning to WN :" << wn << std::endl;
+
+	        float fCurrentInMilliAmps = 1000 * (0.1 * ( sin ( (2 * PI * wn_index )/500 + PI)) + 0.9 );
+
+	        if(!(MIRcatSDK_TuneToWW(wn, MIRcatSDK_UNITS_CM1, 3))){
+
+	        	bool isTuned = false;
+		        while(!isTuned)
+		        {
+		            ret = MIRcatSDK_IsTuned(&isTuned);
+		            ::Sleep(500);
+		        }
+
+	        	std::cout << "Tuned to " << wn << std::endl;
+	        }
+			
+	        if(!(MIRcatSDK_SetQCLParams( 3, 100000, 500, fCurrentInMilliAmps))){
+	        	std::cout << "Set Laser Current to " << fCurrentInMilliAmps << std::endl;
+	        }
+
+	        if(!(MIRcatSDK_TurnEmissionOn())){
+	        	std::cout << "Laser Emission on." << std::endl;
+	        }
+		}	
+
+
+		if ( wn >= 1422 && wn <= 1690){
+			printf( "========================================================\n");
+	        std::cout << "Tuning to WN :" << wn << std::endl;
+
+	        float fCurrentInMilliAmps = 800 * (0.1 * ( sin ( (2 * PI * wn_index )/500 + PI)) + 0.9 );
+
+	        if(!(MIRcatSDK_TuneToWW(wn, MIRcatSDK_UNITS_CM1, 2))){
+
+	        	bool isTuned = false;
+		        while(!isTuned)
+		        {
+		            ret = MIRcatSDK_IsTuned(&isTuned);
+		            ::Sleep(500);
+		        }
+
+	        	std::cout << "Tuned to " << wn << std::endl;
+	        }
+
+	        if(!(MIRcatSDK_SetQCLParams(2, 100000, 500, fCurrentInMilliAmps))){
+	        	std::cout << "Set Laser Current to " << fCurrentInMilliAmps << std::endl;
+	        }
+
+	        if(!(MIRcatSDK_TurnEmissionOn())){
+	        	std::cout << "Laser Emission on." << std::endl;
+	        }
+		}	
+
+
+		if ( wn >= 1692 && wn <= 1910){
+			printf( "========================================================\n");
+	        std::cout << "Tuning to WN :" << wn << std::endl;
+
+	        float fCurrentInMilliAmps = 550 * (0.1 * ( sin ( (2 * PI * wn_index )/500 + PI)) + 0.9 );
+
+	        if(!(MIRcatSDK_TuneToWW(wn, MIRcatSDK_UNITS_CM1, 1))){
+
+	        	bool isTuned = false;
+		        while(!isTuned)
+		        {
+		            ret = MIRcatSDK_IsTuned(&isTuned);
+		            ::Sleep(500);
+		        }
+
+	        	std::cout << "Tuned to " << wn << std::endl;
+	        }
+
+			if(!(MIRcatSDK_SetQCLParams(1, 100000, 500, fCurrentInMilliAmps))){
+	        	std::cout << "Set Laser Current to " << fCurrentInMilliAmps << std::endl;
+	        }
+
+	        if(!(MIRcatSDK_TurnEmissionOn())){
+	        	std::cout << "Laser Emission on." << std::endl;
+	        }
+		}	
+
 
 		//connect to the A3200 Aerotech stage controller
 		std::cout <<"Connecting to A3200...";
@@ -495,19 +572,15 @@ int main(int argc, char* argv[]) {
 			
 			A3200CommandExecute(hstage, TASKID_01, cmd_step.c_str(), &result_stage);		//move the stage
 			A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 200", &result_stage);		//wait
-			
-			
 			CreateDisplayImageExample(hcam, i, fpg, dest_sub_path);											//capture images		 
 
-
 			rtsProgressBar((float)(i + 1) / (float)grabs * 100);
-
 			//std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;				//display the number of images
 
 			A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 100", &result_stage);		//wait again
 		}
 		A3200CommandExecute(hstage, TASKID_01, cmd_return.c_str(), &result_stage);				//move stage back to origin
-//		A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 2000", &result_stage);		//wait again
+//		A3200CommandExescute(hstage, TASKID_01, "MOVEDELAY Z, 2000", &result_stage);		//wait again
 	}
 
     if(!(MIRcatSDK_TurnEmissionOff())){
