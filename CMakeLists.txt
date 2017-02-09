@@ -58,13 +58,13 @@ target_link_libraries(qcl-tdi
 						${MIRCAT_LIB}
 		  )
 
-add_executable(qcl-control
+add_executable(qcl-laser-tuning
 				${SRC_H}
-				qcl_api.cpp
+				laser-power-compensation.cpp
 				)
 
 #set the link libraries
-target_link_libraries(qcl-control
+target_link_libraries(qcl-laser-tuning
 						${AEROTECH_LIB}
 						${TELEDYNE_ACQ_LIB}
 						${TELEDYNE_SAPERA_LIB}
