@@ -215,7 +215,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 	//std::string module_dir = GetModuleDirectory();
 	//std::string image_dir = module_dir + "\Frames1800\\";
 	
-	for (int frame_index = 0; frame_index < frame_number; frame_index++)
+	for (int frame_index = 0; frame_index < fpg; frame_index++)
 	{
 		// Get a pointer to the image
 		uint16_t * p_image = (uint16_t* ) (buffer.data() + frame_index*frame_data_size);
