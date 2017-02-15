@@ -358,11 +358,12 @@ void aerotechCleanup(A3200Handle h) {
 }
 
 void comp_imaging(int wn, int QCL_index, int QCL_MaxCur, HANDLE_IPS_ACQ handle, DOUBLE result_stage,
-				  std::string cmd_step, std::string cmd_return, int grabs, std::string dest_sub_path, int threshold, int laserpower){
+				  std::string cmd_step, std::string cmd_return, int grabs, std::string dest_sub_path, uint32_t threshold, int laserpower_low){
 
 					  uint32_t ret;												//return value used by MIRcat laser control
 					  bool IsOn = false;
 					  bool santurate = false;
+					  int laserpower_high = 100;
 					  if(!(MIRcatSDK_TuneToWW(wn, MIRcatSDK_UNITS_CM1, QCL_index))){											//tuning to wn
 
 						  bool isTuned = false;
@@ -380,13 +381,9 @@ void comp_imaging(int wn, int QCL_index, int QCL_MaxCur, HANDLE_IPS_ACQ handle, 
 
 					  while (!santurate){
 
-						  int tuning_count = 0;
-
-						  for ( int p = laserpower; p <= 100; p++){
-
-							  float fCurrentInMilliAmps = QCL_MaxCur * p / 100;
-
-							  if(!(MIRcatSDK_SetQCLParams( QCL_index, 100000, 500, fCurrentInMilliAmps))){
+					  	  int p = (laserpower_low + laserpower_high) / 2;
+					  	  float fCurrentInMilliAmps = QCL_MaxCur * p / 100;
+					  	  if(!(MIRcatSDK_SetQCLParams( QCL_index, 100000, 500, fCurrentInMilliAmps))){
 								  std::cout << "Set Laser Current to " << p << '%' << std::endl;					//set laser current 
 							  }
 
@@ -396,52 +393,50 @@ void comp_imaging(int wn, int QCL_index, int QCL_MaxCur, HANDLE_IPS_ACQ handle, 
 									  std::cout << "Laser Emission on." << std::endl;
 								  }
 							  }
+						  uint32_t mean = CalculateMean(handle, fpg);
+						  std::cout << "mean = " << mean << std::endl;
+						  int diff = mean - threshold;
 
-							  uint32_t mean = CalculateMean(handle, fpg);
-							  std::cout << "mean = " << mean << std::endl;
-							  tuning_count++;
-							  if( mean >= threshold || tuning_count >= (100 - laserpower + 1)){
+						  if(abs(diff) <= 250){
+						      santurate = true;
+							  //connect to the A3200 Aerotech stage controller
+							  std::cout <<"Connecting to A3200...";
+							  CHECK_A3200(A3200Connect(&hstage));										//attempt to connect to the controller
+							  std::cout << "done" << std::endl;
 
-								  santurate = true;
-								  //connect to the A3200 Aerotech stage controller
-								  std::cout <<"Connecting to A3200...";
-								  CHECK_A3200(A3200Connect(&hstage));										//attempt to connect to the controller
-								  std::cout << "done" << std::endl;
-
-								  std::cout <<"Enabling axes...";			    							//enable the axes
-								  CHECK_A3200(A3200MotionEnable(hstage, TASKID_01, AXISMASK_00));
-								  std::cout << "done" << std::endl;
-
+							  std::cout <<"Enabling axes...";			    							//enable the axes
+							  CHECK_A3200(A3200MotionEnable(hstage, TASKID_01, AXISMASK_00));
+							  std::cout << "done" << std::endl;
 
 
-								  //perform an imaging pass across the sample
+
+							  //perform an imaging pass across the sample
 
 
-								  for (int i = 0; i < grabs; i++){
+							  for (int i = 0; i < grabs; i++){
 
 
-									  A3200CommandExecute(hstage, TASKID_01, cmd_step.c_str(), &result_stage);		//move the stage
-									  A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 200", &result_stage);		//wait
+								  A3200CommandExecute(hstage, TASKID_01, cmd_step.c_str(), &result_stage);		//move the stage
+								  A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 200", &result_stage);		//wait
 
 
-									  CreateDisplayImageExample(handle, i, fpg, dest_sub_path);											//capture images		 
+								  CreateDisplayImageExample(handle, i, fpg, dest_sub_path);											//capture images		 
 
 
-									  rtsProgressBar((float)(i + 1) / (float)grabs * 100);
+								  rtsProgressBar((float)(i + 1) / (float)grabs * 100);
 
-									  //std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;				//display the number of images
+								  //std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;				//display the number of images
 
-									  A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 100", &result_stage);		//wait again
-								  }
-								  A3200CommandExecute(hstage, TASKID_01, cmd_return.c_str(), &result_stage);				//move stage back to origin
-								  //		A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 2000", &result_stage);		//wait again
-								  break;
+								  A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 100", &result_stage);		//wait again
 							  }
-
-							  else santurate = false;
-
+							  A3200CommandExecute(hstage, TASKID_01, cmd_return.c_str(), &result_stage);				//move stage back to origin
+							  //		A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 2000", &result_stage);		//wait again
 						  }
-					  }
+						  else if (mean > threshold)
+						  	  laserpower_high = p - 1;
+						  else if (mean < threshold)
+						  	  laserpower_low = p + 1;
+						}
 }
 
 int main(int argc, char* argv[]) {
@@ -599,6 +594,8 @@ int main(int argc, char* argv[]) {
 	//imaging
 	//
 	int NumberofTuning = (int) (( maxWN - minWN ) / WNstep ); 
+	static const int badpoints[] = {1456, 1464, 1490, 1496, 1498, 1506, 1516, 1522, 1538, 1558, 1564, 1616, 1622, 1652, 1674, 1684, 1694, 1696, 1698, 1700, 1714, 1734};
+	std::vector<int> badwavenumber(badpoints, badpoints + sizeof(badpoints) / sizeof(badpoints[0]));
 
 	for (int wn_index = 1; wn_index <= NumberofTuning; wn_index++){
 
@@ -616,6 +613,9 @@ int main(int argc, char* argv[]) {
 
 		printf( "========================================================\n");
 		std::cout << "Tuning to WN :" << wn << std::endl;
+
+		if ( std::find(badwavenumber.begin(), badwavenumber.end(), wn) != badwavenumber.end())
+			wn = wn + 2;
 
 		if ( wn >= 910 && wn <= 1170){
 
