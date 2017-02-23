@@ -4,9 +4,9 @@ function M = qcl2mat(input_path)
     D = F([F(:).isdir]);
     D = D(3:end);
 
-    M = uint32(zeros(128, 128, numel(D)));             %create an output matrix
-    for i = 1:length(D)
-        if(D(i).isdir)              %if the file
+    M = uint32(zeros(128, 128, numel(D)));                  %create an output matrix
+    for i = 1:length(D)                                     %for each directory
+        if(D(i).isdir)                                      %if the file
             path = [input_path '\' D(i).name];
             F = dir(path);                                  %get all files in the dir
             fid_in = fopen([path '\' F(3).name], 'rb');       %open the input file
