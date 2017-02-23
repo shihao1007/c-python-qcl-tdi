@@ -16,6 +16,7 @@ function qcl2envi(input_path, outfile, background)
             fid_in = fopen([path '\' F(3).name], 'rb');       %open the input file
             I = fread(fid_in, [128 128], 'uint32');         %read the input file
             fclose(fid_in);
+            I = I / 1600;
             if(BACKGROUND == true)
                 A = -log10(I ./ B(:, :, i));
             else
