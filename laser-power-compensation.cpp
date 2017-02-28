@@ -594,9 +594,10 @@ int main(int argc, char* argv[]) {
 	//imaging
 	//
 	int NumberofTuning = (int) (( maxWN - minWN ) / WNstep ); 
-	static const int badpoints[] = {1456, 1464, 1490, 1496, 1498, 1506, 1516, 1522, 1538, 1558, 1564, 1616, 1622, 1652, 1674, 1684, 1694, 1696, 1698, 1700, 1714, 1734};
-	std::vector<int> badwavenumber(badpoints, badpoints + sizeof(badpoints) / sizeof(badpoints[0]));
-
+	static const int badpoints_plus2[] = {1456, 1464, 1490, 1498, 1506, 1516, 1540, 1564, 1616, 1622, 1652, 1674, 1684, 1694, 1696, 1698, 1700, 1714, 1734};
+	std::vector<int> badwavenumber_plus2(badpoints_plus2, badpoints_plus2 + sizeof(badpoints_plus2) / sizeof(badpoints_plus2[0]));
+	static const int badpoints_minus1[] = {1496, 1522, 1538, 1550, 1558, 1568, 1634, 1646, };
+	std::vector<int> badwavenumber_minus1(badpoints_minus1, badpoints_minus1 + sizeof(badpoints_minus1) / sizeof(badpoints_minus1[0]));
 	for (int wn_index = 1; wn_index <= NumberofTuning; wn_index++){
 
 		//tuning laser
@@ -614,8 +615,11 @@ int main(int argc, char* argv[]) {
 		printf( "========================================================\n");
 		std::cout << "Tuning to WN :" << wn << std::endl;
 
-		if ( std::find(badwavenumber.begin(), badwavenumber.end(), wn) != badwavenumber.end())
+		if ( std::find(badwavenumber_plus2.begin(), badwavenumber_plus2.end(), wn) != badwavenumber_plus2.end())
 			wn = wn + 2;
+
+		if ( std::find(badwavenumber_minus1.begin(), badwavenumber_minus1.end(), wn) != badwavenumber_minus1.end())
+			wn = wn - 1;
 
 		if ( wn >= 910 && wn <= 1170){
 
