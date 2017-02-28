@@ -16,6 +16,8 @@
 #include <stim/parser/arguments.h>
 #include <sstream>
 #include <stim/ui/progressbar.h>
+#include <stim/math/matrix.h>
+#include <stim/parser/filename.h>
 #include <direct.h>
 #include <errno.h>
 #include <cstdio>
@@ -27,7 +29,7 @@
 #include <numeric>
 
 const int fpa_size = 128;
-int fpg = 1600;				//number of frames per grab
+int fpg = 400;				//number of frames per grab
 
 std::string dest_path;		//stores the destination path for all output files
 
@@ -107,11 +109,13 @@ void Initialize_SBF161_Decommute_Table( int grab_num_cols,
 
 std::string GetPGMFileName(const std::string &  parent_directory,
 						   const std::string & base_file_name,
-						   int grab_index,
+						   size_t grab_index,
 						   int frame_index)
 {
+	stim::filename mask(base_file_name);
+	stim::filename newfilename = mask.insert(grab_index, (size_t) 3);
 	std::stringstream ss;
-	ss << parent_directory << base_file_name << "_" <<grab_index<<"_"<< frame_index << ".bin";
+	ss << parent_directory << newfilename.prefix()<<"_"<< frame_index << ".mat";
 	return ss.str();
 }
 
@@ -219,7 +223,7 @@ uint32_t CalculateMean(HANDLE_IPS_ACQ handle_ips, int fpg)
 	return mean;
 }
 
-void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fpg, std::string dest_sub_path)
+void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, size_t grab_index, int fpg, std::string dest_sub_path)
 {
 	uint32_t frame_width = 128;
 	uint32_t frame_height = 128;
@@ -312,8 +316,11 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 	frame_height,
 	GetPGMFileName(dest_sub_path, "sbf161_img", grab_index, 1600));*/
 
-	const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img", grab_index, 1600);
-	WriteArray(TXTfilename.c_str(), p_display_image, frame_height*frame_width);
+	const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img_*", grab_index, 1600);
+	std::stringstream grabindex;
+	grabindex << "s";
+	stim::save_mat4((char*)p_display_image, TXTfilename,grabindex.str(), 128, 128, stim::mat4_int32);
+	//WriteArray(TXTfilename.c_str(), p_display_image, frame_height*frame_width);
 
 	std::chrono::high_resolution_clock::time_point t6 = std::chrono::high_resolution_clock::now();
 	//duration_saving_singleframe = ( std::clock() - start_saving_singleframe ) / (double) CLOCKS_PER_SEC;
@@ -323,8 +330,8 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int grab_index, int fp
 	//duration_saving = ( std::clock() - start_saving ) / (double) CLOCKS_PER_SEC;
 	//std::cout << "\nDuration for saving "<< fpg << " frames: " << duration_saving << " seconds"<< std::endl ;
 
-	std::cout << "total time: " << std::chrono::duration_cast<std::chrono::duration<double>>(t6 - t0).count()<<std::endl;
-	std::cout << "acquire:    " << std::chrono::duration_cast<std::chrono::duration<double>>(t3 - t1).count()<<std::endl;
+	//std::cout << "total time: " << std::chrono::duration_cast<std::chrono::duration<double>>(t6 - t0).count()<<std::endl;
+	//std::cout << "acquire:    " << std::chrono::duration_cast<std::chrono::duration<double>>(t3 - t1).count()<<std::endl;
 	//std::cout << "total time: " << std::chrono::duration_cast<std::chrono::duration<double>>(t4 - t0).count();
 
 }
@@ -364,6 +371,7 @@ void comp_imaging(int wn, int QCL_index, int QCL_MaxCur, HANDLE_IPS_ACQ handle, 
 					  bool IsOn = false;
 					  bool santurate = false;
 					  int laserpower_high = 100;
+					  int tuning_count = 0;
 					  if(!(MIRcatSDK_TuneToWW(wn, MIRcatSDK_UNITS_CM1, QCL_index))){											//tuning to wn
 
 						  bool isTuned = false;
@@ -394,10 +402,11 @@ void comp_imaging(int wn, int QCL_index, int QCL_MaxCur, HANDLE_IPS_ACQ handle, 
 								  }
 							  }
 						  uint32_t mean = CalculateMean(handle, fpg);
+						  tuning_count++;
 						  std::cout << "mean = " << mean << std::endl;
 						  int diff = mean - threshold;
 
-						  if(abs(diff) <= 250){
+						  if(abs(diff) <= 300 || tuning_count >= 8){
 						      santurate = true;
 							  //connect to the A3200 Aerotech stage controller
 							  std::cout <<"Connecting to A3200...";
@@ -443,10 +452,10 @@ int main(int argc, char* argv[]) {
 
 	stim::arglist args;
 	args.add("help", "prints usage information");
-	args.add("grabs", "total number of images to collect", "1", "integer (currently between 1 and 500)");
+	args.add("grabs", "total number of images to collect", "200", "integer (currently between 1 and 500)");
 	args.add("zstep", "number of micrometers between images", "5", "positive value describing stage motion in microns");
-	args.add("minWN", "minimal wavenumber of the tuning range", "1172", "integer (currently between 910 and 1900)");
-	args.add("maxWN", "maximal wavenumber of the tuning range", "1900", "integer (currently between 910 and 1900)");
+	args.add("minWN", "minimal wavenumber of the tuning range", "1490", "integer (currently between 910 and 1900)");
+	args.add("maxWN", "maximal wavenumber of the tuning range", "1690", "integer (currently between 910 and 1900)");
 	args.add("WNstep", "step size of each tuning", "2", "integer (currently between 1 and 8)");
 	args.parse(argc, argv);
 
@@ -598,6 +607,7 @@ int main(int argc, char* argv[]) {
 	std::vector<int> badwavenumber_plus2(badpoints_plus2, badpoints_plus2 + sizeof(badpoints_plus2) / sizeof(badpoints_plus2[0]));
 	static const int badpoints_minus1[] = {1496, 1522, 1538, 1550, 1558, 1568, 1634, 1646, };
 	std::vector<int> badwavenumber_minus1(badpoints_minus1, badpoints_minus1 + sizeof(badpoints_minus1) / sizeof(badpoints_minus1[0]));
+
 	for (int wn_index = 1; wn_index <= NumberofTuning; wn_index++){
 
 		//tuning laser
@@ -621,6 +631,7 @@ int main(int argc, char* argv[]) {
 		if ( std::find(badwavenumber_minus1.begin(), badwavenumber_minus1.end(), wn) != badwavenumber_minus1.end())
 			wn = wn - 1;
 
+
 		if ( wn >= 910 && wn <= 1170){
 
 			comp_imaging(wn, 4, 1400, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 10500, 80);
@@ -635,13 +646,13 @@ int main(int argc, char* argv[]) {
 
 		if ( wn >= 1422 && wn <= 1690){
 
-			comp_imaging(wn, 2, 800, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, threshold, 80);
+			comp_imaging(wn, 2, 800, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 9500	, 60);
 
 		}
 
 		if ( wn >= 1692 && wn <= 1910){
 
-			comp_imaging(wn, 1, 550, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, threshold, 80);
+			comp_imaging(wn, 1, 550, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 12000, 60);
 
 		}
 
