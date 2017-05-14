@@ -29,7 +29,7 @@
 #include <numeric>
 
 const int fpa_size = 128;
-int fpg = 800;				//number of frames per grab
+int fpg = 20;				//number of frames per grab
 
 std::string dest_path;		//stores the destination path for all output files
 
@@ -113,7 +113,7 @@ std::string GetPGMFileName(const std::string &  parent_directory,
 						   int frame_index)
 {
 	stim::filename mask(base_file_name);
-	stim::filename newfilename = mask.insert(grab_index, (size_t) 5);
+	stim::filename newfilename = mask.insert(grab_index, (size_t) 3);
 	std::stringstream ss;
 	ss << parent_directory << newfilename.prefix()<<"_"<< frame_index << ".mat";
 	return ss.str();
@@ -369,9 +369,7 @@ void comp_imaging(int wn, int QCL_index, int QCL_MaxCur, HANDLE_IPS_ACQ handle, 
 
 					  uint32_t ret;												//return value used by MIRcat laser control
 					  bool IsOn = false;
-					  bool santurate = false;
-					  int laserpower_high = 100;
-					  int tuning_count = 0;
+					 
 					  if(!(MIRcatSDK_TuneToWW(wn, MIRcatSDK_UNITS_CM1, QCL_index))){											//tuning to wn
 
 						  bool isTuned = false;
@@ -387,75 +385,47 @@ void comp_imaging(int wn, int QCL_index, int QCL_MaxCur, HANDLE_IPS_ACQ handle, 
 
 
 
-					  while (!santurate){
+					   std::cout <<"Connecting to A3200...";
+					  CHECK_A3200(A3200Connect(&hstage));										//attempt to connect to the controller
+					  std::cout << "done" << std::endl;
 
-					  	  int p = (laserpower_low + laserpower_high) / 2;
-					  	  float fCurrentInMilliAmps = QCL_MaxCur * p / 100;
-					  	  if(!(MIRcatSDK_SetQCLParams( QCL_index, 100000, 500, fCurrentInMilliAmps))){
-								  std::cout << "Set Laser Current to " << p << '%' << std::endl;					//set laser current 
-							  }
-
-							  if(!(MIRcatSDK_IsEmissionOn(&IsOn))){
-
-								  if(!(MIRcatSDK_TurnEmissionOn())){
-									  std::cout << "Laser Emission on." << std::endl;
-								  }
-							  }
-						  uint32_t mean = CalculateMean(handle, fpg);
-						  tuning_count++;
-						  std::cout << "mean = " << mean << std::endl;
-						  int diff = mean - threshold;
-
-						  if(abs(diff) <= 150 || tuning_count >= 7){
-						      santurate = true;
-							  //connect to the A3200 Aerotech stage controller
-							  std::cout <<"Connecting to A3200...";
-							  CHECK_A3200(A3200Connect(&hstage));										//attempt to connect to the controller
-							  std::cout << "done" << std::endl;
-
-							  std::cout <<"Enabling axes...";			    							//enable the axes
-							  CHECK_A3200(A3200MotionEnable(hstage, TASKID_01, AXISMASK_00));
-							  std::cout << "done" << std::endl;
+					  std::cout <<"Enabling axes...";			    							//enable the axes
+					  CHECK_A3200(A3200MotionEnable(hstage, TASKID_01, AXISMASK_00));
+					  std::cout << "done" << std::endl;
 
 
 
-							  //perform an imaging pass across the sample
+					  //perform an imaging pass across the sample
 
 
-							  for (int i = 0; i < grabs; i++){
+					  for (int i = 0; i < grabs; i++){
 
 
-								  A3200CommandExecute(hstage, TASKID_01, cmd_step.c_str(), &result_stage);		//move the stage
-								  A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 200", &result_stage);		//wait
+						  A3200CommandExecute(hstage, TASKID_01, cmd_step.c_str(), &result_stage);		//move the stage
+						  A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 200", &result_stage);		//wait
 
 
-								  CreateDisplayImageExample(handle, i, fpg, dest_sub_path);											//capture images		 
+						  CreateDisplayImageExample(handle, i, fpg, dest_sub_path);											//capture images		 
 
 
-								  rtsProgressBar((float)(i + 1) / (float)grabs * 100);
+						  rtsProgressBar((float)(i + 1) / (float)grabs * 100);
 
-								  //std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;				//display the number of images
+						  //std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;				//display the number of images
 
-								  A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 100", &result_stage);		//wait again
-							  }
-							  A3200CommandExecute(hstage, TASKID_01, cmd_return.c_str(), &result_stage);				//move stage back to origin
-							  //		A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 2000", &result_stage);		//wait again
-						  }
-						  else if (mean > threshold)
-						  	  laserpower_high = p - 1;
-						  else if (mean < threshold)
-						  	  laserpower_low = p + 1;
-						}
+						  A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 100", &result_stage);		//wait again
+					  }
+					  A3200CommandExecute(hstage, TASKID_01, cmd_return.c_str(), &result_stage);				//move stage back to origin
+					  //		A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 2000", &result_stage);		//wait again
 }
 
 int main(int argc, char* argv[]) {
 
 	stim::arglist args;
 	args.add("help", "prints usage information");
-	args.add("grabs", "total number of images to collect", "300", "integer (currently between 1 and 500)");
-	args.add("zstep", "number of micrometers between images", "10", "positive value describing stage motion in microns");
-	args.add("minWN", "minimal wavenumber of the tuning range", "1406", "integer (currently between 910 and 1900)");
-	args.add("maxWN", "maximal wavenumber of the tuning range", "1700", "integer (currently between 910 and 1900)");
+	args.add("grabs", "total number of images to collect", "1", "integer (currently between 1 and 500)");
+	args.add("zstep", "number of micrometers between images", "5", "positive value describing stage motion in microns");
+	args.add("minWN", "minimal wavenumber of the tuning range", "1450", "integer (currently between 910 and 1900)");
+	args.add("maxWN", "maximal wavenumber of the tuning range", "1690", "integer (currently between 910 and 1900)");
 	args.add("WNstep", "step size of each tuning", "2", "integer (currently between 1 and 8)");
 	args.parse(argc, argv);
 
@@ -603,55 +573,61 @@ int main(int argc, char* argv[]) {
 	//imaging
 	//
 	int NumberofTuning = (int) (( maxWN - minWN ) / WNstep ); 
-
-	static const int usefulbands[] = {908,932,964,984,1016,1040,1066,1082,1124,1136,1152,1178,1210,1212,1220,1226,1236,1300,1358,1402,
-		1408,1416,1442,1454,1464,1482,1502,1506,1530,1566,1584,1604,1606,1610,1630,1650,1658,1664,1674,1692,1706,1726,1766,1786,1816};
-	std::vector<int> usefulbandshah(usefulbands, usefulbands + sizeof(usefulbands) / sizeof(usefulbands[0]));
+	/*static const int badpoints_plus2[] = {1456, 1464, 1490, 1498, 1506, 1516, 1540, 1564, 1616, 1622, 1652, 1674, 1684, 1694, 1696, 1698, 1700, 1714, 1734};
+	std::vector<int> badwavenumber_plus2(badpoints_plus2, badpoints_plus2 + sizeof(badpoints_plus2) / sizeof(badpoints_plus2[0]));
+	static const int badpoints_minus1[] = {1496, 1522, 1538, 1550, 1568, 1634};
+	std::vector<int> badwavenumber_minus1(badpoints_minus1, badpoints_minus1 + sizeof(badpoints_minus1) / sizeof(badpoints_minus1[0]));
+	static const int badpoints_minus3[] = {1558, 1646};
+	std::vector<int> badwavenumber_minus3(badpoints_minus3, badpoints_minus3 + sizeof(badpoints_minus3) / sizeof(badpoints_minus3[0]));*/
 
 	for (int wn_index = 1; wn_index <= NumberofTuning; wn_index++){
 
 		//tuning laser
-		
+		std::stringstream sub_dir;												//create an empty string stream
 		int wn = minWN + wn_index * WNstep;
-		
+		sub_dir << dest_path << wn << "\\";												//append to the parent dir string
+		std::string dest_sub_path = sub_dir.str();
+		int mkdirFlag = mkdir(dest_sub_path.c_str());
+		if (mkdirFlag != 0){
+			printf ("Error : %s\n", strerror(errno));
+		}
 		bool * IsOn;										//get the sub folder for saving different wn images
 
 
 		printf( "========================================================\n");
 		std::cout << "Tuning to WN :" << wn << std::endl;
 
-		if ( std::find(usefulbandshah.begin(), usefulbandshah.end(), wn) != usefulbandshah.end()){
-			std::stringstream sub_dir;												//create an empty string stream
-			sub_dir << dest_path << wn << "\\";												//append to the parent dir string
-			std::string dest_sub_path = sub_dir.str();
-			int mkdirFlag = mkdir(dest_sub_path.c_str());
-			if (mkdirFlag != 0){
-				printf ("Error : %s\n", strerror(errno));
-			}
-		
-			if ( wn >= 910 && wn <= 1170){
+		/*if ( std::find(badwavenumber_plus2.begin(), badwavenumber_plus2.end(), wn) != badwavenumber_plus2.end())
+			wn = wn + 2;
 
-			comp_imaging(wn, 4, 1400, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 9300, 60);
+		if ( std::find(badwavenumber_minus1.begin(), badwavenumber_minus1.end(), wn) != badwavenumber_minus1.end())
+			wn = wn - 1;
 
-			}
+		if ( std::find(badwavenumber_minus3.begin(), badwavenumber_minus3.end(), wn) != badwavenumber_minus3.end())
+			wn = wn - 3;*/
 
-			if ( wn >= 1172 && wn <= 1402){
+		if ( wn >= 910 && wn <= 1170){
 
-			comp_imaging(wn, 3, 1000, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 9300, 60);
+			comp_imaging(wn, 4, 1400, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 11000, 60);
 
-			}
+		}
 
-			if ( wn >= 1404 && wn <= 1700){
+		if ( wn >= 1172 && wn <= 1420){
 
-			comp_imaging(wn, 2, 800, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 9300, 60);
+			comp_imaging(wn, 3, 1000, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 11000, 60);
 
-			}
+		}
 
-			if ( wn >= 1702 && wn <= 1910){
+		if ( wn >= 1422 && wn <= 1690){
 
-			comp_imaging(wn, 1, 550, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 9300, 60);
+			comp_imaging(wn, 2, 800, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 12000, 60);
 
-			}
+		}
+
+		if ( wn >= 1692 && wn <= 1910){
+
+			comp_imaging(wn, 1, 550, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 12000, 60);
+
 		}
 
 	}

@@ -43,13 +43,13 @@ file(GLOB SRC_CPP "*.cpp")
 file(GLOB SRC_H "*.h")
 
 #create an executable file
-add_executable(qcl-tdi
+add_executable(qcl-mean
 				${SRC_H}
-				main.cpp
+				calculate-mean.cpp
 				)
 
 #set the link libraries
-target_link_libraries(qcl-tdi
+target_link_libraries(qcl-mean
 						${AEROTECH_LIB}
 						${TELEDYNE_ACQ_LIB}
 						${TELEDYNE_SAPERA_LIB}
@@ -58,13 +58,59 @@ target_link_libraries(qcl-tdi
 						${MIRCAT_LIB}
 		  )
 
-add_executable(qcl-laser-tuning
+add_executable(qcl-laser-tuning-discrete
 				${SRC_H}
-				laser-power-compensation.cpp
+				laser-power-compensation_new.cpp
 				)
 
 #set the link libraries
-target_link_libraries(qcl-laser-tuning
+target_link_libraries(qcl-laser-tuning-discrete
+						${AEROTECH_LIB}
+						${TELEDYNE_ACQ_LIB}
+						${TELEDYNE_SAPERA_LIB}
+						${TELEDYNE_FRAMEGRAB_LIB}
+						${CMAKE_THREAD_LIBS_INIT}
+						${MIRCAT_LIB}
+		  )
+
+
+add_executable(qcl-laser-tuning-constant
+				${SRC_H}
+				laser-power-compensation_new.cpp
+				)
+
+#set the link libraries
+target_link_libraries(qcl-laser-tuning-constant
+						${AEROTECH_LIB}
+						${TELEDYNE_ACQ_LIB}
+						${TELEDYNE_SAPERA_LIB}
+						${TELEDYNE_FRAMEGRAB_LIB}
+						${CMAKE_THREAD_LIBS_INIT}
+						${MIRCAT_LIB}
+		  )
+
+add_executable(qcl-const-power
+				${SRC_H}
+				constant-power-imaging.cpp
+				)
+
+#set the link libraries
+target_link_libraries(qcl-const-power
+						${AEROTECH_LIB}
+						${TELEDYNE_ACQ_LIB}
+						${TELEDYNE_SAPERA_LIB}
+						${TELEDYNE_FRAMEGRAB_LIB}
+						${CMAKE_THREAD_LIBS_INIT}
+						${MIRCAT_LIB}
+		  )
+
+add_executable(qcl-laser-scan
+				${SRC_H}
+				laser-scanning.cpp
+				)
+
+#set the link libraries
+target_link_libraries(qcl-laser-scan
 						${AEROTECH_LIB}
 						${TELEDYNE_ACQ_LIB}
 						${TELEDYNE_SAPERA_LIB}

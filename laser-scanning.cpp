@@ -29,7 +29,7 @@
 #include <numeric>
 
 const int fpa_size = 128;
-int fpg = 800;				//number of frames per grab
+int fpg = 200;				//number of frames per grab
 
 std::string dest_path;		//stores the destination path for all output files
 
@@ -364,89 +364,84 @@ void aerotechCleanup(A3200Handle h) {
 	CHECK_A3200(A3200Disconnect(h));
 }
 
-void comp_imaging(int wn, int QCL_index, int QCL_MaxCur, HANDLE_IPS_ACQ handle, DOUBLE result_stage,
-				  std::string cmd_step, std::string cmd_return, int grabs, std::string dest_sub_path, uint32_t threshold, int laserpower_low){
+bool comp_imaging(int wn_center, int QCL_index, int QCL_MaxCur, HANDLE_IPS_ACQ handle, DOUBLE result_stage,
+				  std::string cmd_step, std::string cmd_return, int grabs, uint32_t threshold, int laserpower_low){
 
-					  uint32_t ret;												//return value used by MIRcat laser control
-					  bool IsOn = false;
-					  bool santurate = false;
-					  int laserpower_high = 100;
-					  int tuning_count = 0;
-					  if(!(MIRcatSDK_TuneToWW(wn, MIRcatSDK_UNITS_CM1, QCL_index))){											//tuning to wn
+	uint32_t ret;												//return value used by MIRcat laser control
+	bool IsOn = false;
+	bool santurate = false;
+	int laserpower_high = 100;
+	int tuning_count = 0;
+	if(!(MIRcatSDK_TuneToWW(wn_center, MIRcatSDK_UNITS_CM1, QCL_index))){											//tuning to wn
 
-						  bool isTuned = false;
+		bool isTuned = false;
 
-						  while(!isTuned)
-						  {
-							  ret = MIRcatSDK_IsTuned(&isTuned);
-							  ::Sleep(500);
-						  }
+		while(!isTuned)
+		{
+			ret = MIRcatSDK_IsTuned(&isTuned);
+			::Sleep(500);
+		}
 
-						  std::cout << "Tuned to " << wn << std::endl;
-					  }
-
-
-
-					  while (!santurate){
-
-					  	  int p = (laserpower_low + laserpower_high) / 2;
-					  	  float fCurrentInMilliAmps = QCL_MaxCur * p / 100;
-					  	  if(!(MIRcatSDK_SetQCLParams( QCL_index, 100000, 500, fCurrentInMilliAmps))){
-								  std::cout << "Set Laser Current to " << p << '%' << std::endl;					//set laser current 
-							  }
-
-							  if(!(MIRcatSDK_IsEmissionOn(&IsOn))){
-
-								  if(!(MIRcatSDK_TurnEmissionOn())){
-									  std::cout << "Laser Emission on." << std::endl;
-								  }
-							  }
-						  uint32_t mean = CalculateMean(handle, fpg);
-						  tuning_count++;
-						  std::cout << "mean = " << mean << std::endl;
-						  int diff = mean - threshold;
-
-						  if(abs(diff) <= 150 || tuning_count >= 7){
-						      santurate = true;
-							  //connect to the A3200 Aerotech stage controller
-							  std::cout <<"Connecting to A3200...";
-							  CHECK_A3200(A3200Connect(&hstage));										//attempt to connect to the controller
-							  std::cout << "done" << std::endl;
-
-							  std::cout <<"Enabling axes...";			    							//enable the axes
-							  CHECK_A3200(A3200MotionEnable(hstage, TASKID_01, AXISMASK_00));
-							  std::cout << "done" << std::endl;
+		std::cout << "Tuned to " << wn_center << std::endl;
+	}
 
 
 
-							  //perform an imaging pass across the sample
+	while (!santurate){
 
+		int p = (laserpower_low + laserpower_high) / 2;
+		float fCurrentInMilliAmps = QCL_MaxCur * p / 100;
+		if(!(MIRcatSDK_SetQCLParams( QCL_index, 100000, 500, fCurrentInMilliAmps))){
+				std::cout << "Set Laser Current to " << p << '%' << std::endl;					//set laser current 
+			}
 
-							  for (int i = 0; i < grabs; i++){
+			if(!(MIRcatSDK_IsEmissionOn(&IsOn))){
 
+				if(!(MIRcatSDK_TurnEmissionOn())){
+					std::cout << "Laser Emission on." << std::endl;
+				}
+			}
+		uint32_t mean = CalculateMean(handle, fpg);
+		tuning_count++;
+		std::cout << "mean = " << mean << std::endl;
+		int diff = mean - threshold;
 
-								  A3200CommandExecute(hstage, TASKID_01, cmd_step.c_str(), &result_stage);		//move the stage
-								  A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 200", &result_stage);		//wait
+		if(abs(diff) <= 150 || tuning_count >= 7){
+			santurate = true;
+							 
+			return santurate;
+							  	
 
-
-								  CreateDisplayImageExample(handle, i, fpg, dest_sub_path);											//capture images		 
-
-
-								  rtsProgressBar((float)(i + 1) / (float)grabs * 100);
-
-								  //std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;				//display the number of images
-
-								  A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 100", &result_stage);		//wait again
-							  }
-							  A3200CommandExecute(hstage, TASKID_01, cmd_return.c_str(), &result_stage);				//move stage back to origin
-							  //		A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 2000", &result_stage);		//wait again
-						  }
-						  else if (mean > threshold)
-						  	  laserpower_high = p - 1;
-						  else if (mean < threshold)
-						  	  laserpower_low = p + 1;
-						}
+		}
+		else if (mean > threshold)
+			laserpower_high = p - 1;
+		else if (mean < threshold)
+			laserpower_low = p + 1;
+	}
 }
+
+void laser_scan(bool santurate, int minWN, int WNstep, int NumberofTuning, HANDLE_IPS_ACQ handle, std::string dest_sub_path){
+
+	if (santurate == true){
+	
+		for (int wn_index = 1; wn_index <= NumberofTuning; wn_index++){
+
+				int wn = minWN + wn_index * WNstep;
+		
+					bool * IsOn;										
+
+					CreateDisplayImageExample(handle, wn_index, fpg, dest_sub_path);											//capture images		 
+
+
+					rtsProgressBar((float)(wn_index + 1) / (float)NumberofTuning * 100);
+
+					//std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;				//display the number of images
+				}
+
+	
+		}
+}
+
 
 int main(int argc, char* argv[]) {
 
@@ -455,7 +450,7 @@ int main(int argc, char* argv[]) {
 	args.add("grabs", "total number of images to collect", "300", "integer (currently between 1 and 500)");
 	args.add("zstep", "number of micrometers between images", "10", "positive value describing stage motion in microns");
 	args.add("minWN", "minimal wavenumber of the tuning range", "1406", "integer (currently between 910 and 1900)");
-	args.add("maxWN", "maximal wavenumber of the tuning range", "1700", "integer (currently between 910 and 1900)");
+	args.add("maxWN", "maximal wavenumber of the tuning range", "1420", "integer (currently between 910 and 1900)");
 	args.add("WNstep", "step size of each tuning", "2", "integer (currently between 1 and 8)");
 	args.parse(argc, argv);
 
@@ -604,61 +599,69 @@ int main(int argc, char* argv[]) {
 	//
 	int NumberofTuning = (int) (( maxWN - minWN ) / WNstep ); 
 
-	static const int usefulbands[] = {908,932,964,984,1016,1040,1066,1082,1124,1136,1152,1178,1210,1212,1220,1226,1236,1300,1358,1402,
-		1408,1416,1442,1454,1464,1482,1502,1506,1530,1566,1584,1604,1606,1610,1630,1650,1658,1664,1674,1692,1706,1726,1766,1786,1816};
-	std::vector<int> usefulbandshah(usefulbands, usefulbands + sizeof(usefulbands) / sizeof(usefulbands[0]));
+			
+	int wn_center = ( minWN + maxWN) / 2;
+	bool mean_ok = false;
 
-	for (int wn_index = 1; wn_index <= NumberofTuning; wn_index++){
+	if ( wn_center >= 910 && wn_center <= 1170){
 
-		//tuning laser
-		
-		int wn = minWN + wn_index * WNstep;
-		
-		bool * IsOn;										//get the sub folder for saving different wn images
-
-
-		printf( "========================================================\n");
-		std::cout << "Tuning to WN :" << wn << std::endl;
-
-		if ( std::find(usefulbandshah.begin(), usefulbandshah.end(), wn) != usefulbandshah.end()){
-			std::stringstream sub_dir;												//create an empty string stream
-			sub_dir << dest_path << wn << "\\";												//append to the parent dir string
-			std::string dest_sub_path = sub_dir.str();
-			int mkdirFlag = mkdir(dest_sub_path.c_str());
-			if (mkdirFlag != 0){
-				printf ("Error : %s\n", strerror(errno));
-			}
-		
-			if ( wn >= 910 && wn <= 1170){
-
-			comp_imaging(wn, 4, 1400, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 9300, 60);
-
-			}
-
-			if ( wn >= 1172 && wn <= 1402){
-
-			comp_imaging(wn, 3, 1000, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 9300, 60);
-
-			}
-
-			if ( wn >= 1404 && wn <= 1700){
-
-			comp_imaging(wn, 2, 800, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 9300, 60);
-
-			}
-
-			if ( wn >= 1702 && wn <= 1910){
-
-			comp_imaging(wn, 1, 550, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 9300, 60);
-
-			}
-		}
+	mean_ok = comp_imaging(wn_center, 4, 1400, hcam, result_stage, cmd_step, cmd_return, grabs, 9300, 60);
 
 	}
+
+	if ( wn_center >= 1172 && wn_center <= 1402){
+
+	mean_ok = comp_imaging(wn_center, 3, 1000, hcam, result_stage, cmd_step, cmd_return, grabs, 9300, 60);
+
+	}
+
+	if ( wn_center >= 1404 && wn_center <= 1700){
+
+	mean_ok = comp_imaging(wn_center, 2, 800, hcam, result_stage, cmd_step, cmd_return, grabs, 9300, 60);
+
+	}
+
+	if ( wn_center >= 1702 && wn_center <= 1910){
+
+	mean_ok = comp_imaging(wn_center, 1, 550, hcam, result_stage, cmd_step, cmd_return, grabs, 9300, 60);
+
+	}
+
+	for (int i = 0; i < grabs; i++){
+
+		std::stringstream sub_dir;												//create an empty string stream
+		sub_dir << dest_path << i << "\\";												//append to the parent dir string
+		std::string dest_sub_path;
+		dest_sub_path.reserve(64);
+		dest_sub_path = sub_dir.str();
+		int mkdirFlag = mkdir(dest_sub_path.c_str());
+		if (mkdirFlag != 0){
+			printf ("Error : %s\n", strerror(errno));
+		}																	//get the sub folder for saving different position images
+
+		//connect to the A3200 Aerotech stage controller
+		std::cout <<"Connecting to A3200...";
+		CHECK_A3200(A3200Connect(&hstage));										//attempt to connect to the controller
+		std::cout << "done" << std::endl;
+
+		std::cout <<"Enabling axes...";			    							//enable the axes
+		CHECK_A3200(A3200MotionEnable(hstage, TASKID_01, AXISMASK_00));
+		std::cout << "done" << std::endl;
+
+
+		A3200CommandExecute(hstage, TASKID_01, cmd_step.c_str(), &result_stage);		//move the stage
+		A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 200", &result_stage);		//wait
+
+		laser_scan(mean_ok, minWN, WNstep, NumberofTuning, hcam, dest_sub_path);
+			
+	}
+	A3200CommandExecute(hstage, TASKID_01, cmd_return.c_str(), &result_stage);				//move stage back to origin
+	//		A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 2000", &result_stage);		//wait again
+	
 	if(!(MIRcatSDK_TurnEmissionOff())){
 		std::cout << "Laser Emission off." << std::endl;
 	}
-	if(!(MIRcatSDK_DisarmLaser())){
-		std::cout << "Laser Disarmed." << std::endl;
-	}
+	//if(!(MIRcatSDK_DisarmLaser())){
+	//	std::cout << "Laser Disarmed." << std::endl;
+	//}
 }
