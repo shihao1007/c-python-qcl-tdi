@@ -118,3 +118,18 @@ target_link_libraries(qcl-laser-scan
 						${CMAKE_THREAD_LIBS_INIT}
 						${MIRCAT_LIB}
 		  )
+		  
+add_executable(qcl-capture-frames
+				${SRC_H}
+				capture-frames.cpp
+				)
+
+#set the link libraries
+target_link_libraries(qcl-capture-frames
+						${AEROTECH_LIB}
+						${TELEDYNE_ACQ_LIB}
+						${TELEDYNE_SAPERA_LIB}
+						${TELEDYNE_FRAMEGRAB_LIB}
+						${CMAKE_THREAD_LIBS_INIT}
+						${MIRCAT_LIB}
+		  )
