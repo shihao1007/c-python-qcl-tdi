@@ -29,7 +29,7 @@
 #include <numeric>
 
 const int fpa_size = 128;
-int fpg = 800;				//number of frames per grab
+int fpg = 1;				//number of frames per grab
 
 std::string dest_path;		//stores the destination path for all output files
 
@@ -141,7 +141,7 @@ uint32_t CalculateMean(HANDLE_IPS_ACQ handle_ips, int fpg)
 	int bytes_per_pixel = 2;
 	int frame_data_size = frame_width * frame_height * bytes_per_pixel;
 
-	std::chrono::high_resolution_clock::time_point t0 = std::chrono::high_resolution_clock::now();
+
 	// Configure the frame acquisition window size
 	CHECK_IPS(IPS_SetFrameWindow( handle_ips, 
 		0,
@@ -151,7 +151,7 @@ uint32_t CalculateMean(HANDLE_IPS_ACQ handle_ips, int fpg)
 
 	// Start capturing a block of fpg frames
 	tsi::ips::VMemory<uint8_t> buffer(frame_data_size*fpg);
-	std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+
 
 	CHECK_IPS(IPS_StartGrabbing( handle_ips,         
 		fpg,            // Capture Fra_Number frames then stop capturing
@@ -160,7 +160,7 @@ uint32_t CalculateMean(HANDLE_IPS_ACQ handle_ips, int fpg)
 		false));        // No wrap
 
 
-	std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+
 	// Wait for all frames to be acquired
 	uint64_t frame_number;
 	uint8_t * p_frame = NULL;
@@ -170,7 +170,7 @@ uint32_t CalculateMean(HANDLE_IPS_ACQ handle_ips, int fpg)
 		false,                       // Pause after WaitFrame returns
 		&p_frame,                    // Return a pointer to the frame
 		&frame_number));              // Return the frame number of the returned frame
-	std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
+
 
 	// *********** Decommute ********************
 	//
@@ -186,7 +186,7 @@ uint32_t CalculateMean(HANDLE_IPS_ACQ handle_ips, int fpg)
 		frame_width,
 		frame_height,
 		decommute_table);
-	std::chrono::high_resolution_clock::time_point t4 = std::chrono::high_resolution_clock::now();
+
 	// Decommute the images.
 	std::vector<uint16_t> display_image(frame_width * frame_height);
 	std::vector<uint32_t> display_image_all(frame_width * frame_height, 0);
@@ -229,8 +229,9 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, size_t grab_index, int
 	uint32_t frame_height = 128;
 	int bytes_per_pixel = 2;
 	int frame_data_size = frame_width * frame_height * bytes_per_pixel;
+//	std::chrono::high_resolution_clock::time_point t6 = std::chrono::high_resolution_clock::now();
 
-	std::chrono::high_resolution_clock::time_point t0 = std::chrono::high_resolution_clock::now();
+
 	// Configure the frame acquisition window size
 	CHECK_IPS(IPS_SetFrameWindow( handle_ips, 
 		0,
@@ -240,7 +241,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, size_t grab_index, int
 
 	// Start capturing a block of fpg frames
 	tsi::ips::VMemory<uint8_t> buffer(frame_data_size*fpg);
-	std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+
 
 	CHECK_IPS(IPS_StartGrabbing( handle_ips,         
 		fpg,            // Capture Fra_Number frames then stop capturing
@@ -249,7 +250,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, size_t grab_index, int
 		false));        // No wrap
 
 
-	std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+
 	// Wait for all frames to be acquired
 	uint64_t frame_number;
 	uint8_t * p_frame = NULL;
@@ -259,7 +260,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, size_t grab_index, int
 		false,                       // Pause after WaitFrame returns
 		&p_frame,                    // Return a pointer to the frame
 		&frame_number));              // Return the frame number of the returned frame
-	std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
+//	std::chrono::high_resolution_clock::time_point t7 = std::chrono::high_resolution_clock::now();
 
 
 	// *********** Decommute ********************
@@ -276,7 +277,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, size_t grab_index, int
 		frame_width,
 		frame_height,
 		decommute_table);
-	std::chrono::high_resolution_clock::time_point t4 = std::chrono::high_resolution_clock::now();
+
 	// Decommute the images.
 	std::vector<uint16_t> display_image(frame_width * frame_height);
 	std::vector<uint32_t> display_image_all(frame_width * frame_height, 0);
@@ -307,7 +308,8 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, size_t grab_index, int
 	//duration_decommute = ( std::clock() - start_decommute ) / (double) CLOCKS_PER_SEC;
 	//std::cout << "\nDuration for decommute 1 frame: " << duration_decommute << " seconds"<< std::endl ;
 	p_display_image = display_image_all.data();
-	std::chrono::high_resolution_clock::time_point t5 = std::chrono::high_resolution_clock::now();
+	//std::chrono::high_resolution_clock::time_point t8 = std::chrono::high_resolution_clock::now();
+
 
 	//start_saving_singleframe = std::clock();
 	// Save as txt file
@@ -322,17 +324,17 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, size_t grab_index, int
 	stim::save_mat4((char*)p_display_image, TXTfilename,grabindex.str(), 128, 128, stim::mat4_int32);
 	//WriteArray(TXTfilename.c_str(), p_display_image, frame_height*frame_width);
 
-	std::chrono::high_resolution_clock::time_point t6 = std::chrono::high_resolution_clock::now();
+
 	//duration_saving_singleframe = ( std::clock() - start_saving_singleframe ) / (double) CLOCKS_PER_SEC;
 	//std::cout << "\nDuration for saving 1 frame: " << duration_saving_singleframe << " seconds"<< std::endl ;
 	// Stop acquiring frames
 	CHECK_IPS(IPS_StopGrabbing(handle_ips));
 	//duration_saving = ( std::clock() - start_saving ) / (double) CLOCKS_PER_SEC;
 	//std::cout << "\nDuration for saving "<< fpg << " frames: " << duration_saving << " seconds"<< std::endl ;
-
-	//std::cout << "total time: " << std::chrono::duration_cast<std::chrono::duration<double>>(t6 - t0).count()<<std::endl;
-	//std::cout << "acquire:    " << std::chrono::duration_cast<std::chrono::duration<double>>(t3 - t1).count()<<std::endl;
-	//std::cout << "total time: " << std::chrono::duration_cast<std::chrono::duration<double>>(t4 - t0).count();
+	//std::chrono::high_resolution_clock::time_point t9 = std::chrono::high_resolution_clock::now();
+	//std::cout << "grab images: " << std::chrono::duration_cast<std::chrono::duration<double>>(t7 - t6).count()<<std::endl;
+	//std::cout << "decomute: " << std::chrono::duration_cast<std::chrono::duration<double>>(t8 - t7).count()<<std::endl;
+	//std::cout << "saving images: " << std::chrono::duration_cast<std::chrono::duration<double>>(t9 - t8).count()<<std::endl;
 
 }
 
@@ -421,25 +423,33 @@ void comp_imaging(int wn, int QCL_index, int QCL_MaxCur, HANDLE_IPS_ACQ handle, 
 
 							  //perform an imaging pass across the sample
 
-
+								  std::chrono::high_resolution_clock::time_point t0 = std::chrono::high_resolution_clock::now();
 							  for (int i = 0; i < grabs; i++){
 
 
 								  A3200CommandExecute(hstage, TASKID_01, cmd_step.c_str(), &result_stage);		//move the stage
+				//				  std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 								  A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 200", &result_stage);		//wait
-
+			//					  std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
 
 								  CreateDisplayImageExample(handle, i, fpg, dest_sub_path);											//capture images		 
-
+			//					  std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
 
 								  rtsProgressBar((float)(i + 1) / (float)grabs * 100);
 
 								  //std::cout << (float)(i + 1) / (float)grabs * 100 <<" %." << std::endl;				//display the number of images
 
 								  A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 100", &result_stage);		//wait again
+
+								  
+								  //std::cout << "move stage once: " << std::chrono::duration_cast<std::chrono::duration<double>>(t1 - t0).count()<<std::endl;
+								  //std::cout << "wait after move: " << std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count()<<std::endl;
+								  //std::cout << "acquire images " << std::chrono::duration_cast<std::chrono::duration<double>>(t3 - t2).count()<<std::endl;
 							  }
+									std::chrono::high_resolution_clock::time_point t4 = std::chrono::high_resolution_clock::now();
+									std::cout << "total time: " << std::chrono::duration_cast<std::chrono::duration<double>>(t4 - t0).count()<<std::endl;
 							  A3200CommandExecute(hstage, TASKID_01, cmd_return.c_str(), &result_stage);				//move stage back to origin
-							  //		A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 2000", &result_stage);		//wait again
+							  		A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 2000", &result_stage);		//wait again
 						  }
 						  else if (mean > threshold)
 						  	  laserpower_high = p - 1;
@@ -452,10 +462,10 @@ int main(int argc, char* argv[]) {
 
 	stim::arglist args;
 	args.add("help", "prints usage information");
-	args.add("grabs", "total number of images to collect", "300", "integer (currently between 1 and 500)");
+	args.add("grabs", "total number of images to collect", "1000", "integer (currently between 1 and 500)");
 	args.add("zstep", "number of micrometers between images", "10", "positive value describing stage motion in microns");
-	args.add("minWN", "minimal wavenumber of the tuning range", "1406", "integer (currently between 910 and 1900)");
-	args.add("maxWN", "maximal wavenumber of the tuning range", "1700", "integer (currently between 910 and 1900)");
+	args.add("minWN", "minimal wavenumber of the tuning range", "1248", "integer (currently between 910 and 1900)");
+	args.add("maxWN", "maximal wavenumber of the tuning range", "1250", "integer (currently between 910 and 1900)");
 	args.add("WNstep", "step size of each tuning", "2", "integer (currently between 1 and 8)");
 	args.parse(argc, argv);
 
@@ -604,7 +614,7 @@ int main(int argc, char* argv[]) {
 	//
 	int NumberofTuning = (int) (( maxWN - minWN ) / WNstep ); 
 
-	static const int usefulbands[] = {908,932,964,984,1016,1040,1066,1082,1124,1136,1152,1178,1210,1212,1220,1226,1236,1300,1358,1402,
+	static const int usefulbands[] = {908,932,964,984,1016,1040,1066,1082,1124,1136,1152,1178,1210,1212,1220,1226,1236,1250,1300,1358,1402,
 		1408,1416,1442,1454,1464,1482,1502,1506,1530,1566,1584,1604,1606,1610,1630,1650,1658,1664,1674,1692,1706,1726,1766,1786,1816};
 	std::vector<int> usefulbandshah(usefulbands, usefulbands + sizeof(usefulbands) / sizeof(usefulbands[0]));
 
@@ -637,13 +647,13 @@ int main(int argc, char* argv[]) {
 
 			if ( wn >= 1172 && wn <= 1402){
 
-			comp_imaging(wn, 3, 1000, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 9300, 60);
+			comp_imaging(wn, 3, 1000, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 9300, 40);
 
 			}
 
 			if ( wn >= 1404 && wn <= 1700){
 
-			comp_imaging(wn, 2, 800, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 9300, 60);
+			comp_imaging(wn, 2, 800, hcam, result_stage, cmd_step, cmd_return, grabs, dest_sub_path, 9500, 60);
 
 			}
 
@@ -658,7 +668,7 @@ int main(int argc, char* argv[]) {
 	if(!(MIRcatSDK_TurnEmissionOff())){
 		std::cout << "Laser Emission off." << std::endl;
 	}
-	if(!(MIRcatSDK_DisarmLaser())){
-		std::cout << "Laser Disarmed." << std::endl;
-	}
+	//if(!(MIRcatSDK_DisarmLaser())){
+	//	std::cout << "Laser Disarmed." << std::endl;
+	//}
 }

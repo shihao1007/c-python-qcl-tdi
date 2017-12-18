@@ -29,7 +29,7 @@
 #include <numeric>
 
 const int fpa_size = 128;
-int fpg = 200;				//number of frames per grab
+int fpg = 1;				//number of frames per grab
 
 std::string dest_path;		//stores the destination path for all output files
 
@@ -420,15 +420,31 @@ bool comp_imaging(int wn_center, int QCL_index, int QCL_MaxCur, HANDLE_IPS_ACQ h
 	}
 }
 
-void laser_scan(bool santurate, int minWN, int WNstep, int NumberofTuning, HANDLE_IPS_ACQ handle, std::string dest_sub_path){
+void laser_scan(bool santurate, int minWN, int WNstep, int NumberofTuning, HANDLE_IPS_ACQ handle, int QCL_index, std::string dest_sub_path){
 
 	if (santurate == true){
 	
 		for (int wn_index = 1; wn_index <= NumberofTuning; wn_index++){
 
 				int wn = minWN + wn_index * WNstep;
-		
-					bool * IsOn;										
+
+				uint32_t ret;												//return value used by MIRcat laser control
+				bool IsOn = false;
+				bool santurate = false;
+				int laserpower_high = 100;
+				int tuning_count = 0;
+				if(!(MIRcatSDK_TuneToWW(wn, MIRcatSDK_UNITS_CM1, QCL_index))){											//tuning to wn
+
+				bool isTuned = false;
+
+				while(!isTuned)
+				{
+				ret = MIRcatSDK_IsTuned(&isTuned);
+				::Sleep(100);
+				}
+
+				}
+													
 
 					CreateDisplayImageExample(handle, wn_index, fpg, dest_sub_path);											//capture images		 
 
@@ -447,10 +463,10 @@ int main(int argc, char* argv[]) {
 
 	stim::arglist args;
 	args.add("help", "prints usage information");
-	args.add("grabs", "total number of images to collect", "300", "integer (currently between 1 and 500)");
+	args.add("grabs", "total number of images to collect", "1", "integer (currently between 1 and 500)");
 	args.add("zstep", "number of micrometers between images", "10", "positive value describing stage motion in microns");
 	args.add("minWN", "minimal wavenumber of the tuning range", "1406", "integer (currently between 910 and 1900)");
-	args.add("maxWN", "maximal wavenumber of the tuning range", "1420", "integer (currently between 910 and 1900)");
+	args.add("maxWN", "maximal wavenumber of the tuning range", "1700", "integer (currently between 910 and 1900)");
 	args.add("WNstep", "step size of each tuning", "2", "integer (currently between 1 and 8)");
 	args.parse(argc, argv);
 
@@ -602,35 +618,37 @@ int main(int argc, char* argv[]) {
 			
 	int wn_center = ( minWN + maxWN) / 2;
 	bool mean_ok = false;
+	int QCL_index = 0;
 
 	if ( wn_center >= 910 && wn_center <= 1170){
 
 	mean_ok = comp_imaging(wn_center, 4, 1400, hcam, result_stage, cmd_step, cmd_return, grabs, 9300, 60);
-
+	QCL_index = 4;
 	}
 
 	if ( wn_center >= 1172 && wn_center <= 1402){
 
 	mean_ok = comp_imaging(wn_center, 3, 1000, hcam, result_stage, cmd_step, cmd_return, grabs, 9300, 60);
-
+	QCL_index = 3;
 	}
 
 	if ( wn_center >= 1404 && wn_center <= 1700){
 
 	mean_ok = comp_imaging(wn_center, 2, 800, hcam, result_stage, cmd_step, cmd_return, grabs, 9300, 60);
-
+	QCL_index = 2;
 	}
 
 	if ( wn_center >= 1702 && wn_center <= 1910){
 
 	mean_ok = comp_imaging(wn_center, 1, 550, hcam, result_stage, cmd_step, cmd_return, grabs, 9300, 60);
-
+	QCL_index = 1;
 	}
 
 	for (int i = 0; i < grabs; i++){
 
+		int position_index = 1000 + i;
 		std::stringstream sub_dir;												//create an empty string stream
-		sub_dir << dest_path << i << "\\";												//append to the parent dir string
+		sub_dir << dest_path << position_index << "\\";												//append to the parent dir string
 		std::string dest_sub_path;
 		dest_sub_path.reserve(64);
 		dest_sub_path = sub_dir.str();
@@ -652,7 +670,7 @@ int main(int argc, char* argv[]) {
 		A3200CommandExecute(hstage, TASKID_01, cmd_step.c_str(), &result_stage);		//move the stage
 		A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 200", &result_stage);		//wait
 
-		laser_scan(mean_ok, minWN, WNstep, NumberofTuning, hcam, dest_sub_path);
+		laser_scan(mean_ok, minWN, WNstep, NumberofTuning, hcam, QCL_index, dest_sub_path);
 			
 	}
 	A3200CommandExecute(hstage, TASKID_01, cmd_return.c_str(), &result_stage);				//move stage back to origin
