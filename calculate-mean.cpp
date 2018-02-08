@@ -175,7 +175,7 @@ uint32_t CalculateMean(HANDLE_IPS_ACQ handle_ips, int fpg)
 			display_image[i] = display_image[i] ^ 0x3FFF;
 		}
 
-		std::transform ( display_image_all.begin(), display_image_all.end(), display_image.begin(), display_image_all.begin(), std::plus<uint32_t>());\
+		std::transform ( display_image_all.begin(), display_image_all.end(), display_image.begin(), display_image_all.begin(), std::plus<uint32_t>());
 			//duration_decommute = ( std::clock() - start_decommute ) / (double) CLOCKS_PER_SEC;
 			//std::cout << "\nDuration for decommute 1 frame: " << duration_decommute << " seconds"<< std::endl ;
 

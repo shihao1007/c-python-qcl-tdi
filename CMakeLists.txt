@@ -27,6 +27,11 @@ find_library(TELEDYNE_FRAMEGRAB_LIB NAMES sbfem.lib PATHS lib32)
 #ask for the MIRcat libraries
 find_library(MIRCAT_LIB NAMES MIRcatSDK.lib PATHS lib32)
 
+#ask for the OpenGL libraries
+#find_library(OPENGL_LIB NAMES OpenGL32.lib PATHS lib32)
+find_package(OpenGL REQUIRED)
+find_package(GLUT REQUIRED)
+
 #build the executable in the binary directory on MS Visual Studio
 if ( MSVC )
 	SET( CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${OUTPUT_DIRECTORY}")
@@ -36,6 +41,8 @@ endif ( MSVC )
 include_directories(
 					"include"
 					${STIM_INCLUDE_DIR}
+					${OPENGL_INCLUDE_DIRS}
+					${GLUT_INCLUDE_DIR}
 					)
 
 #Assign source files to the appropriate variables
@@ -132,4 +139,33 @@ target_link_libraries(qcl-capture-frames
 						${TELEDYNE_FRAMEGRAB_LIB}
 						${CMAKE_THREAD_LIBS_INIT}
 						${MIRCAT_LIB}
+		  )
+
+add_executable(qcl-holo-cap
+				${SRC_H}
+				holo3pos.cpp
+				)
+
+#set the link libraries
+target_link_libraries(qcl-holo-cap
+						${AEROTECH_LIB}
+						${TELEDYNE_ACQ_LIB}
+						${TELEDYNE_SAPERA_LIB}
+						${TELEDYNE_FRAMEGRAB_LIB}
+						${CMAKE_THREAD_LIBS_INIT}
+						${MIRCAT_LIB}
+		  )
+
+add_executable(showim
+				${SRC_H}
+				showim.cpp
+				)
+
+#set the link libraries
+target_link_libraries(showim
+						#${OPENGL_LIB}
+						${OPENGL_gl_LIBRARY}
+						${OPENGL_glu_LIBRARY}
+						${GLUT_LIBRARIES}
+
 		  )
