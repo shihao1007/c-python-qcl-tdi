@@ -319,7 +319,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, size_t grab_index, int
 	const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img_*", grab_index, 1600);
 	std::stringstream grabindex;
 	grabindex << "s";
-	stim::save_mat4((char*)p_display_image, TXTfilename,grabindex.str(), 128, 128, stim::mat4_int32);
+	stim::save_mat4((char*)p_display_image, TXTfilename,grabindex.str(), 128, 128, 0, stim::mat4_int32);
 	//WriteArray(TXTfilename.c_str(), p_display_image, frame_height*frame_width);
 
 	std::chrono::high_resolution_clock::time_point t6 = std::chrono::high_resolution_clock::now();

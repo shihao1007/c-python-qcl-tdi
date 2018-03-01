@@ -169,3 +169,18 @@ target_link_libraries(showim
 						${GLUT_LIBRARIES}
 
 		  )
+
+add_executable(qcl-inte
+				${SRC_H}
+				inte.cpp
+				)
+
+#set the link libraries
+target_link_libraries(qcl-inte
+						${AEROTECH_LIB}
+						${TELEDYNE_ACQ_LIB}
+						${TELEDYNE_SAPERA_LIB}
+						${TELEDYNE_FRAMEGRAB_LIB}
+						${CMAKE_THREAD_LIBS_INIT}
+						${MIRCAT_LIB}
+		  )
