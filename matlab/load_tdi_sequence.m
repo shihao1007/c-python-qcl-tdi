@@ -1,4 +1,4 @@
-function S = load_tdi_sequence(mask)
+ function S = load_tdi_sequence(mask)
     F = dir(mask);
 
     S = zeros(128, 128, length(F));             %allocate space for the TDI sequence
@@ -7,4 +7,4 @@ function S = load_tdi_sequence(mask)
         load(fname);
         S(:, :, fi) = s;
     end
-end
+ end
