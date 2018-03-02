@@ -431,7 +431,7 @@ int main(int argc, char* argv[]) {
 
 	stim::arglist args;
 	args.add("help", "prints usage information");
-	args.add("frames", "total number of images to collect", "5000", "integer (currently between 1 and 500)");
+	args.add("frames", "total number of images to collect", "50", "integer (currently between 1 and 500)");
 	args.add("WN", "wavenumber to do imaging at", "1250", "integer (currently between 910 and 1900)");
 	args.parse(argc, argv);
 

@@ -203,9 +203,9 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int fpg, std::string d
 	// Decommute the images.
 	std::vector<uint16_t> display_image(frame_width * frame_height);
 	std::vector<uint16_t> display_image_mean(frame_width * frame_height);
-	std::vector<uint16_t> display_image_all(frame_width * frame_height, 0);
+	std::vector<size_t> display_image_all(frame_width * frame_height, 0);
 	//float aver_rate = 1.000000 / fpg;
-	uint32_t * p_display_image;
+	size_t * p_display_image;
 	//std::string module_dir = GetModuleDirectory();
 	//std::string image_dir = module_dir + "\Frames1800\\";
 
@@ -227,7 +227,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int fpg, std::string d
 
 		// add image vectors elemental wise
 
-		std::transform ( display_image_all.begin(), display_image_all.end(), display_image.begin(), display_image_all.begin(), std::plus<uint32_t>());
+		std::transform ( display_image_all.begin(), display_image_all.end(), display_image.begin(), display_image_all.begin(), std::plus<size_t>());
 
 		//rtsProgressBar((float)(frame_index + 1) / (float)fpg * 100);
 		
@@ -284,12 +284,12 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int fpg, std::string d
 
 	//save as a whole
 
-	uint32_t * p_single_frame =  display_image_all.data();
-	const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img_*", fpg, 1600);
-	FILE * picFile;
-	picFile = fopen (TXTfilename.c_str(), "wb");
-	fwrite( p_single_frame, sizeof(uint32_t), 128*128*fpg, picFile);
-	fclose(picFile);
+	size_t * p_single_frame =  display_image_all.data();
+		const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img_*", fpg, 1600);
+		FILE * picFile;
+		picFile = fopen (TXTfilename.c_str(), "wb");
+		fwrite( p_single_frame, sizeof(size_t), 128*128, picFile);
+		fclose(picFile);
 
 	//WriteArray(TXTfilename.c_str(), p_display_image, frame_height*frame_width);
 
@@ -394,7 +394,7 @@ void aerotechCleanup(A3200Handle h) {
 }
 
 void holo_capture(int wn, int positions, int QCL_index, int QCL_MaxCur, HANDLE_IPS_ACQ handle, DOUBLE result_stage,
-				  std::string cmd_step, std::string cmd_return, int frames){
+				  std::string dest_sub_path, int frames, int lp){
 
 				uint32_t ret;												//return value used by MIRcat laser control
 				bool IsOn = false;
@@ -443,8 +443,8 @@ int main(int argc, char* argv[]) {
 	stim::arglist args;
 	args.add("help", "prints usage information");
 	args.add("zstep", "number of micrometers between images", "0.5", "positive value describing stage motion in microns");
-	args.add("inte_time", "effictive integration time to collect", "1000", "positive value describing integration time in micron seconds");
-	args.add("WN", "wavenumber to do imaging at", "1250", "integer (currently between 910 and 1900)");
+	args.add("inte_time", "effictive integration time to collect", "450", "positive value describing integration time in micron seconds");
+	args.add("WN", "wavenumber to do imaging at", "1220", "integer (currently between 910 and 1900)");
 	args.add("laserpower","laser power to do imaging at","100","integer (currently between 1 and 100)");
 	args.add("positions","number of different hologram positions","1","integer (currently between 1 and 16)");
 	args.parse(argc, argv);
@@ -465,7 +465,7 @@ int main(int argc, char* argv[]) {
 	int lp = args["laserpower"].as_int();
 	int positions = args["positions"].as_int();
 
-	float ini_inte_time = 15.125;
+	float ini_inte_time = 15;
 	int nframe = inte_time / ini_inte_time;
 
 
@@ -602,16 +602,16 @@ int main(int argc, char* argv[]) {
 		"$(IPS_SDK_DATA_DIR)\\license.lcx",				//specify the license
 		&hcam));											//fill the handle
 
-	ipsPrintDiagnostics(hcam);
+	//ipsPrintDiagnostics(hcam);
 
 	//
 	//imaging
 	//
 
 	int R_tick = 1;
-	int C_tick = 122;
+	int C_tick = 121;
 		  
-	int32_t intewrite = IntegrationTimeWriteExample(handle, R_tick, C_tick);
+	int32_t intewrite = IntegrationTimeWriteExample(hcam, R_tick, C_tick);
 
 		//tuning laser
 
@@ -628,25 +628,25 @@ int main(int argc, char* argv[]) {
 		
 			if ( wn >= 910 && wn <= 1170){
 
-			holo_capture(wn, positions, 4, 1400, hcam, result_stage, cmd_step, cmd_return, nframe);
+			holo_capture(wn, positions, 4, 1400, hcam, result_stage, dest_sub_path, nframe, lp);
 
 			}
 
 			if ( wn >= 1172 && wn <= 1402){
 
-			holo_capture(wn, positions, 3, 1000, hcam, result_stage, cmd_step, cmd_return, nframe);
+			holo_capture(wn, positions, 3, 1000, hcam, result_stage, dest_sub_path, nframe, lp);
 
 			}
 
 			if ( wn >= 1404 && wn <= 1700){
 
-			holo_capture(wn, positions, 2, 800, hcam, result_stage, cmd_step, cmd_return, nframe);
+			holo_capture(wn, positions, 2, 800, hcam, result_stage, dest_sub_path, nframe, lp);
 
 			}
 
 			if ( wn >= 1702 && wn <= 1910){
 
-			holo_capture(wn, positions, 1, 550, hcam, result_stage, cmd_step, cmd_return, nframe);
+			holo_capture(wn, positions, 1, 550, hcam, result_stage, dest_sub_path, nframe, lp);
 
 			}
 		
