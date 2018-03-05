@@ -145,7 +145,7 @@ void SaveGrayScalePGM(uint16_t * p_pixel_data, int width, int height, int frame_
   ofile.close();
 } 
 
-void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int fpg, std::string dest_sub_path)
+void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int fpg, std::string dest_sub_path, int wn, int ncap)
 {
 	uint32_t frame_width = 128;
 	uint32_t frame_height = 128;
@@ -285,7 +285,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int fpg, std::string d
 	//save as a whole
 
 	size_t * p_single_frame =  display_image_all.data();
-		const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img_*", fpg, 1600);
+		const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img_*", ncap, wn);
 		FILE * picFile;
 		picFile = fopen (TXTfilename.c_str(), "wb");
 		fwrite( p_single_frame, sizeof(size_t), 128*128, picFile);
@@ -394,7 +394,7 @@ void aerotechCleanup(A3200Handle h) {
 }
 
 void holo_capture(int wn, int positions, int QCL_index, int QCL_MaxCur, HANDLE_IPS_ACQ handle, DOUBLE result_stage,
-				  std::string dest_sub_path, int frames, int lp){
+				  std::string dest_sub_path, int frames, int lp, int ncap){
 
 				uint32_t ret;												//return value used by MIRcat laser control
 				bool IsOn = false;
@@ -425,10 +425,10 @@ void holo_capture(int wn, int positions, int QCL_index, int QCL_MaxCur, HANDLE_I
 					}
 				}
 
+				for ( int i = 1; i < ncap + 1; i ++){
 
-
-							CreateDisplayImageExample(handle, frames, dest_sub_path);											//capture images		 
-							//					  std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
+							CreateDisplayImageExample(handle, frames, dest_sub_path, wn, i);											//capture images		 
+				}		//					  std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
 
 							// rtsProgressBar((float)(i + 1) / (float)positions * 100);
 						
@@ -444,6 +444,7 @@ int main(int argc, char* argv[]) {
 	args.add("help", "prints usage information");
 	args.add("zstep", "number of micrometers between images", "0.5", "positive value describing stage motion in microns");
 	args.add("inte_time", "effictive integration time to collect", "450", "positive value describing integration time in micron seconds");
+	args.add("ncap", "number of captures to collect", "100", "positive value describing repetitive captures at the same integration time");
 	args.add("WN", "wavenumber to do imaging at", "1220", "integer (currently between 910 and 1900)");
 	args.add("laserpower","laser power to do imaging at","100","integer (currently between 1 and 100)");
 	args.add("positions","number of different hologram positions","1","integer (currently between 1 and 16)");
@@ -462,6 +463,7 @@ int main(int argc, char* argv[]) {
 
 	int inte_time = args["inte_time"].as_int();									//get the number of images to be acquired		
 	int wn = args["WN"].as_int();
+	int ncap = args["ncap"].as_int();
 	int lp = args["laserpower"].as_int();
 	int positions = args["positions"].as_int();
 
@@ -628,25 +630,25 @@ int main(int argc, char* argv[]) {
 		
 			if ( wn >= 910 && wn <= 1170){
 
-			holo_capture(wn, positions, 4, 1400, hcam, result_stage, dest_sub_path, nframe, lp);
+			holo_capture(wn, positions, 4, 1400, hcam, result_stage, dest_sub_path, nframe, lp, ncap);
 
 			}
 
 			if ( wn >= 1172 && wn <= 1402){
 
-			holo_capture(wn, positions, 3, 1000, hcam, result_stage, dest_sub_path, nframe, lp);
+			holo_capture(wn, positions, 3, 1000, hcam, result_stage, dest_sub_path, nframe, lp, ncap);
 
 			}
 
 			if ( wn >= 1404 && wn <= 1700){
 
-			holo_capture(wn, positions, 2, 800, hcam, result_stage, dest_sub_path, nframe, lp);
+			holo_capture(wn, positions, 2, 800, hcam, result_stage, dest_sub_path, nframe, lp, ncap);
 
 			}
 
 			if ( wn >= 1702 && wn <= 1910){
 
-			holo_capture(wn, positions, 1, 550, hcam, result_stage, dest_sub_path, nframe, lp);
+			holo_capture(wn, positions, 1, 550, hcam, result_stage, dest_sub_path, nframe, lp, ncap);
 
 			}
 		
