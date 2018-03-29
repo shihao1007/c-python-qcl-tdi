@@ -211,7 +211,7 @@ extern "C"
                                               uint64_t  buffer_size_bytes);
   IPS_API int32_t IPS_StartGrabbing(const HANDLE_IPS_ACQ handle,
                                     uint64_t num_frames,
-                                    uint8_t * p_buffer,
+                                    uint16_t * p_buffer,
                                     uint64_t  buffer_size_bytes,
                                     BOOL_IPS  allow_wrap);
   IPS_API int32_t IPS_WaitFrame(const HANDLE_IPS_ACQ handle,

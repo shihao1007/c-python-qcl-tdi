@@ -113,7 +113,7 @@ std::string GetPGMFileName(const std::string &  parent_directory,
 						   int frame_index)
 {
 	stim::filename mask(base_file_name);
-	stim::filename newfilename = mask.insert(grab_index, (size_t) 5);
+	stim::filename newfilename = mask.insert(grab_index, (size_t) 6);
 	std::stringstream ss;
 	ss << parent_directory << newfilename.prefix()<<"_"<< frame_index;
 	//ss << parent_directory << newfilename.prefix()<<"_"<< frame_index << ".txt";
@@ -145,7 +145,7 @@ void SaveGrayScalePGM(uint16_t * p_pixel_data, int width, int height, int frame_
   ofile.close();
 } 
 
-void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int fpg, std::string dest_sub_path, int wn, int ncap)
+void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int fpg, std::string dest_sub_path, int wn, int grab_index)
 {
 	uint32_t frame_width = 128;
 	uint32_t frame_height = 128;
@@ -162,7 +162,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int fpg, std::string d
 
 	//std::chrono::high_resolution_clock::time_point t4 = std::chrono::high_resolution_clock::now();
 	// Start capturing a block of fpg frames
-	tsi::ips::VMemory<uint8_t> buffer(frame_data_size*fpg);
+	tsi::ips::VMemory<uint16_t> buffer(frame_data_size*fpg);
 	//std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
 	CHECK_IPS(IPS_StartGrabbing( handle_ips,         
@@ -203,7 +203,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int fpg, std::string d
 	// Decommute the images.
 	std::vector<uint16_t> display_image(frame_width * frame_height);
 	std::vector<uint16_t> display_image_mean(frame_width * frame_height);
-	std::vector<size_t> display_image_all(frame_width * frame_height, 0);
+	std::vector<uint16_t> display_image_all(frame_width * frame_height, 0);
 	//float aver_rate = 1.000000 / fpg;
 	size_t * p_display_image;
 	//std::string module_dir = GetModuleDirectory();
@@ -227,17 +227,19 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int fpg, std::string d
 
 		// add image vectors elemental wise
 
-		std::transform ( display_image_all.begin(), display_image_all.end(), display_image.begin(), display_image_all.begin(), std::plus<size_t>());
+		//std::transform ( display_image_all.begin(), display_image_all.end(), display_image.begin(), display_image_all.begin(), std::plus<size_t>());
 
 		//rtsProgressBar((float)(frame_index + 1) / (float)fpg * 100);
 		
 		// concatenating vectors one by one
 		
-		//display_image_all.insert(display_image_all.end(), display_image.begin(), display_image.end());
+		display_image_all.insert(display_image_all.end(), display_image.begin(), display_image.end());
 
-		//rtsProgressBar((float)(frame_index + 1) / (float)fpg * 100);
+		rtsProgressBar((float)(frame_index + 1) / (float)fpg * 100);
 
 	}
+
+
 	//std::cout << "   "<<std::endl;
 	// average all captured frames into one vector
 
@@ -264,31 +266,49 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int fpg, std::string d
 	// frame_number,
 	// TXTfilename);
 
-	//save individual pics
+	//save individual pics as mat files
 	
 	//for (int frame_index = 0; frame_index < frame_number; frame_index++)
 	//{
-		// Get a pointer to the image
-		/*uint16_t * p_single_frame = (uint16_t* ) display_image_all.data();
+	//	 //Get a pointer to the image
+	//	uint16_t * p_single_frame = (uint16_t* ) display_image_all.data();
 
-		const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img_*", position_index, 1600);
-		std::stringstream grabindex;
-		grabindex << "s";
-		stim::save_mat4((char*)p_single_frame, TXTfilename,grabindex.str(), 128, 128, fpg, stim::mat4_int16);*/
-		
-		//rtsProgressBar((float)(frame_index + 1) / (float)fpg * 100);
+	//	const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img_*", position_index, 1600);
+	//	std::stringstream grabindex;
+	//	grabindex << "s";
+	//	stim::save_mat4((char*)p_single_frame, TXTfilename,grabindex.str(), 128, 128, fpg, stim::mat4_int16);
+	//	
+	//	rtsProgressBar((float)(frame_index + 1) / (float)fpg * 100);
+	//
+	//}
+	//	std::cout << "   "<<std::endl;
+
+
+		//save individual pics as binary files
 	
+	//for (int frame_index = 0; frame_index < fpg; frame_index++)
+	//{
+	//	 //Get a pointer to the image
+	//	uint16_t * p_single_frame =  display_image_all.data();
+	//	const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img_*", grab_index, wn);
+	//	FILE * picFile;
+	//	picFile = fopen (TXTfilename.c_str(), "wb");
+	//	fwrite( p_single_frame, sizeof(uint16_t), 128*128, picFile);
+	//	fclose(picFile);
+	//	
+	//	//rtsProgressBar((float)(frame_index + 1) / (float)fpg * 100);
+	//
 	//}
 		//std::cout << "   "<<std::endl;
 
 
 	//save as a whole
 
-	size_t * p_single_frame =  display_image_all.data();
-		const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img_*", ncap, wn);
+	uint16_t * p_single_frame =  display_image_all.data() + frame_data_size;
+		const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img_*", 1, wn);
 		FILE * picFile;
 		picFile = fopen (TXTfilename.c_str(), "wb");
-		fwrite( p_single_frame, sizeof(size_t), 128*128, picFile);
+		fwrite( p_single_frame, sizeof(uint16_t), 128*128*fpg, picFile);
 		fclose(picFile);
 
 	//WriteArray(TXTfilename.c_str(), p_display_image, frame_height*frame_width);
@@ -428,9 +448,10 @@ void holo_capture(int wn, int positions, int QCL_index, int QCL_MaxCur, HANDLE_I
 				for ( int i = 1; i < ncap + 1; i ++){
 
 							CreateDisplayImageExample(handle, frames, dest_sub_path, wn, i);											//capture images		 
+							//rtsProgressBar((float)(i + 1) / (float)ncap * 100);
 				}		//					  std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
 
-							// rtsProgressBar((float)(i + 1) / (float)positions * 100);
+							 
 						
 
 			}
@@ -443,10 +464,10 @@ int main(int argc, char* argv[]) {
 	stim::arglist args;
 	args.add("help", "prints usage information");
 	args.add("zstep", "number of micrometers between images", "0.5", "positive value describing stage motion in microns");
-	args.add("inte_time", "effictive integration time to collect", "450", "positive value describing integration time in micron seconds");
-	args.add("ncap", "number of captures to collect", "100", "positive value describing repetitive captures at the same integration time");
+	args.add("inte_time", "effictive integration time to collect", "75000", "positive value describing integration time in micron seconds");
+	args.add("ncap", "number of captures to collect", "1", "positive value describing repetitive captures at the same integration time");
 	args.add("WN", "wavenumber to do imaging at", "1220", "integer (currently between 910 and 1900)");
-	args.add("laserpower","laser power to do imaging at","100","integer (currently between 1 and 100)");
+	args.add("laserpower","laser power to do imaging at","90","integer (currently between 1 and 100)");
 	args.add("positions","number of different hologram positions","1","integer (currently between 1 and 16)");
 	args.parse(argc, argv);
 
@@ -610,8 +631,8 @@ int main(int argc, char* argv[]) {
 	//imaging
 	//
 
-	int R_tick = 1;
-	int C_tick = 121;
+	int R_tick = 1;										// R_tick = 1 + 1 means 17.25 microsecond integration time
+	int C_tick = 121;                                   // C_tick = 1 + 120 means 15 microsecond integration time
 		  
 	int32_t intewrite = IntegrationTimeWriteExample(hcam, R_tick, C_tick);
 

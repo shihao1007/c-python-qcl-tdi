@@ -9,19 +9,19 @@ import os, os.path
 from matplotlib import pyplot as plt
 import subprocess
 
-imfolder = r'C:\Users\shihao\Desktop\ir-images\ir-holography\exe-test-2'
-ncap = str(200);                         #number of captured images passed into snap.exe 
-inte_fold = 120;                         #effective integration time = 15 microsecond * inte_fold
+imfolder = r'C:\Users\shihao\Desktop\ir-images\ir-holography\new-inte-test'
+ncap = str(100);                         #number of captured images passed into snap.exe 
+inte_fold = 30;                         #effective integration time = 15 microsecond * inte_fold
 pixel_mean = list()
 pixel_std = list()
-for i in range(1, inte_fold):
-    nframe = str(15 * i)
-    subprocess.call([r"qcl-snap.exe", imfolder, '--inte_time',nframe,'--ncap',ncap,'--WN','1220'])
+#for i in range(1, inte_fold + 1):
+#    nframe = str(15 * i * 4)
+#    subprocess.call([r"qcl-snap.exe", imfolder, '--inte_time',nframe,'--ncap',ncap,'--WN','1220'])
 
     
     
 for j in range (1, inte_fold):
-    eff_inte = j * 15
+    eff_inte = j * 15 * 4
     intefoldername = imfolder + '\\' + str(eff_inte)
     flst = os.listdir(intefoldername) # dir is your directory path
     number_files = len(flst)
@@ -30,7 +30,7 @@ for j in range (1, inte_fold):
         imname = intefoldername + '\\' + flst[i]
         im = numpy.fromfile(imname, dtype=numpy.uint32,count=-1,sep='')
         im = numpy.reshape(im, (128, 128))
-        pixel.append(im [64,64])
+        pixel.append(im [60,60])
     
     
     pixel_mean.append(numpy.mean(pixel, axis = 0))

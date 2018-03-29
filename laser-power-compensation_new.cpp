@@ -150,7 +150,7 @@ uint32_t CalculateMean(HANDLE_IPS_ACQ handle_ips, int fpg)
 		frame_height));
 
 	// Start capturing a block of fpg frames
-	tsi::ips::VMemory<uint8_t> buffer(frame_data_size*fpg);
+	tsi::ips::VMemory<uint64_t> buffer(frame_data_size*fpg);
 
 
 	CHECK_IPS(IPS_StartGrabbing( handle_ips,         
@@ -240,7 +240,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, size_t grab_index, int
 		frame_height));
 
 	// Start capturing a block of fpg frames
-	tsi::ips::VMemory<uint8_t> buffer(frame_data_size*fpg);
+	tsi::ips::VMemory<uint64_t> buffer(frame_data_size*fpg);
 
 
 	CHECK_IPS(IPS_StartGrabbing( handle_ips,         
@@ -341,11 +341,11 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, size_t grab_index, int
 void ipsPrintDiagnostics(HANDLE_IPS_ACQ handle) {
 	// Display the camera and frame grabber diagnostic data
 	std::vector<char> diag_buffer(IPS_MAX_DIAGNOSTIC_STRING_BYTES);		//allocate a character array
-	uint32_t diag_buffer_size(0);									//initialize the buffer size to zero (0)
+	uint64_t diag_buffer_size(0);									//initialize the buffer size to zero (0)
 	//get the camera diagnostics - fill diag_buffer with a string describing the camera status								
 	CHECK_IPS(IPS_GetCameraDiagnostics(handle,
 		diag_buffer.data(),
-		(uint32_t)diag_buffer.size(),
+		(uint64_t)diag_buffer.size(),
 		&diag_buffer_size));
 
 	if (strlen(diag_buffer.data()) == diag_buffer_size - 1)			//if the diagnostic string exists
@@ -353,7 +353,7 @@ void ipsPrintDiagnostics(HANDLE_IPS_ACQ handle) {
 	//get the frame grabber diagnostics
 	CHECK_IPS(IPS_GetFrameGrabberDiagnostics(handle,
 		diag_buffer.data(),
-		(uint32_t)diag_buffer.size(),
+		(uint64_t)diag_buffer.size(),
 		&diag_buffer_size));
 
 	if (strlen(diag_buffer.data()) == diag_buffer_size - 1)			//if the diagnostic string exists

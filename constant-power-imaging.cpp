@@ -150,7 +150,7 @@ uint32_t CalculateMean(HANDLE_IPS_ACQ handle_ips, int fpg)
 		frame_height));
 
 	// Start capturing a block of fpg frames
-	tsi::ips::VMemory<uint8_t> buffer(frame_data_size*fpg);
+	tsi::ips::VMemory<uint64_t> buffer(frame_data_size*fpg);
 	std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
 	CHECK_IPS(IPS_StartGrabbing( handle_ips,         
@@ -239,7 +239,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, size_t grab_index, int
 		frame_height));
 
 	// Start capturing a block of fpg frames
-	tsi::ips::VMemory<uint8_t> buffer(frame_data_size*fpg);
+	tsi::ips::VMemory<uint64_t> buffer(frame_data_size*fpg);
 	std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
 	CHECK_IPS(IPS_StartGrabbing( handle_ips,         
