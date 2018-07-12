@@ -20,7 +20,7 @@ import subprocess
 from pylab import *
 
 #specify all imaging parameters
-data_dir = r'C:\Users\shihao\Desktop\ir-images\ir-holography\brokencage-beads3'  #directory of all raw data
+data_dir = r'D:\irimages\irholography\brokencage-beads\brokencage-beads3'  #directory of all raw data
 zstep = 1               #stage moving stepsize, delta_m, lightpath length difference in the hologram
 num_frames = 50         #number of averaged frames for each image, to minimize laser fluctuation
 positions = 20          #number of different positions of the stage. i.e. number of measurements
@@ -31,6 +31,7 @@ inte = 37               #integration time of FPA
 image_seq = numpy.zeros((128, 128, positions))
 ref_seq = numpy.zeros((128, 128, positions))
 ref_sqrt = numpy.zeros((128, 128))
+
 #call .exe file to do imaging
 #subprocess.call([r"qcl-holo-cap.exe", data_dir, '--zstep', str(zstep), '--positions', str(positions), '--frames', str(num_frames), '--laserpower', str(lp), '--inte', str(inte)])
 
@@ -47,7 +48,7 @@ else:
         image_seq[:, :, i] = image_data
 
 #read in background image
-re_dir = r'C:\Users\shihao\Desktop\ir-images\ir-holography\brokencage-beads3-bg'
+re_dir = r'D:\irimages\irholography\brokencage-beads\brokencage-beads3-bg'
 re_list = os.listdir(re_dir)
 number_res = len(re_list)
 if( number_res != positions):
@@ -83,39 +84,52 @@ _min, _max = numpy.amin(image_seq), numpy.amax(image_seq)
 
 
 #specify which portion of hologram will be used to calculate field
-num = 4
-start = 0
-end = start + num
-lambdA = 8
-k = 2 * numpy.pi / lambdA
+num = 4                     #number of measurements used to do phase reconstruction. theoritically more than 3 is enough
+start = 0                   #the starting point of sampling from the raw dataset
+end = start + num           #the end point of sampling
+lambdA = 8                  #wavelength of the laser
+k = 2 * numpy.pi / lambdA   #wave vector k
 
+#D matrix denoting the difference between consecutive measuremnts
 D = [(image_seq[:,:,start + i + 1] - image_seq[:,:,start + i]) for i in range(num)]
+
+#P matrix denoting the phase shifting terms
 P = [[numpy.exp(-1j * k * zstep * i), numpy.exp(1j * k * zstep * i)] for i in range(num)]
 
+#convert D and P to matrices or numpy arrays from lists
 D = numpy.asarray(D)
 P = numpy.matrix(numpy.asarray(P))
+
+#calculate the Hermitian conjugate of P matrix and its inverse
 P_hermint = P.getH()
 PH_P_inv = numpy.linalg.inv(P_hermint * P)
 
+#linear P matrix term before D matrix when calculating interferometric cross terms u
 PH_P_Ph =  PH_P_inv * P_hermint
 
-U = numpy.zeros((2,1,128,128))
+#initialize interferometric cross terms u as a 2x1 matrix for each point on the image with itself and its conjugate
+u = numpy.zeros((2,1,128,128))
 
+#transform P matrix term and duplicate itself into higher dimention for dot product with D matrix for the whole image
 PH_P_Ph = numpy.asarray(PH_P_Ph)
 PH_P_Ph = numpy.repeat((numpy.repeat(numpy.reshape(PH_P_Ph,(2,4,1,1)),128,axis = 2)),128,axis = 3)
+
+#for each pixel on the image, do a doc product to calculate interferometric cross terms u
 D = D.reshape(4,1,128,128)
 for i in range(128):
     for j in range(128):
-        U[:,:,i,j] = numpy.dot(PH_P_Ph[:,:,i,j], D[:,:,i,j])
-        
+        u[:,:,i,j] = numpy.dot(PH_P_Ph[:,:,i,j], D[:,:,i,j])
+
+#initialize a field to store u from the cross terms
 f = numpy.zeros((1,1,128,128))
-f[:] = U[1,:,:,:]
+f[:] = u[1,:,:,:]
 f = f.reshape((128,128))
 
+#calculate the scattering field F from reference field and extra terms in the equation
 expterm = numpy.exp(-1j * k * zstep) - 1
 dominator = expterm * ref_sqrt
-
 F = f / dominator
 
+#plot out scattering field
 plt.figure()
 plt.imshow(numpy.real(F))
