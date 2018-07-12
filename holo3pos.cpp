@@ -116,7 +116,7 @@ std::string GetPGMFileName(const std::string &  parent_directory,
 	stim::filename newfilename = mask.insert(grab_index, (size_t) 5);
 	std::stringstream ss;
 	/*ss << parent_directory << newfilename.prefix()<<"_"<< frame_index << ".mat";*/
-	ss << parent_directory << newfilename.prefix()<<"_"<< frame_index << ".txt";
+	ss << parent_directory << newfilename.prefix()<<"_"<< frame_index << ".bin";
 	return ss.str();
 }
 
@@ -152,7 +152,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int position_index, in
 	int bytes_per_pixel = 2;
 	int frame_data_size = frame_width * frame_height * bytes_per_pixel;
 
-	//std::chrono::high_resolution_clock::time_point t0 = std::chrono::high_resolution_clock::now();
+	std::chrono::high_resolution_clock::time_point tgrab_start = std::chrono::high_resolution_clock::now();
 	// Configure the frame acquisition window size
 	CHECK_IPS(IPS_SetFrameWindow( handle_ips, 
 		0,
@@ -162,7 +162,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int position_index, in
 
 	//std::chrono::high_resolution_clock::time_point t4 = std::chrono::high_resolution_clock::now();
 	// Start capturing a block of fpg frames
-	tsi::ips::VMemory<uint64_t> buffer(frame_data_size*fpg);
+	tsi::ips::VMemory<uint16_t> buffer(frame_data_size*fpg);
 	//std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
 	CHECK_IPS(IPS_StartGrabbing( handle_ips,         
@@ -182,7 +182,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int position_index, in
 		false,                       // Pause after WaitFrame returns
 		&p_frame,                    // Return a pointer to the frame
 		&frame_number));              // Return the frame number of the returned frame
-	//std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
+	std::chrono::high_resolution_clock::time_point tgrab_end = std::chrono::high_resolution_clock::now();
 
 
 	// *********** Decommute ********************
@@ -237,6 +237,7 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int position_index, in
 
 	}
 	std::cout << "   "<<std::endl;
+	std::chrono::high_resolution_clock::time_point tdecommute_end = std::chrono::high_resolution_clock::now();
 	// average all captured frames into one vector
 
 	std::transform( display_image_all.begin(), display_image_all.end(), display_image_mean.begin(),std::bind2nd(std::divides<uint32_t>(),fpg));
@@ -252,14 +253,23 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int position_index, in
 	//start_saving_singleframe = std::clock();
 	// Save as txt file
 
-	uint16_t * p_single_frame =  display_image_mean.data();
-	const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img_*", position_index, 1600);
-	FILE * picFile;
-	SaveGrayScalePGM( p_single_frame,
-	frame_width,
-	frame_height,
-	TXTfilename);
+	//uint16_t * p_single_frame =  display_image_mean.data();
+	//const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img_*", position_index, 1600);
+	//FILE * picFile;
+	//SaveGrayScalePGM( p_single_frame,
+	//frame_width,
+	//frame_height,
+	//TXTfilename);
 
+	//save as a binary file
+	uint16_t * p_single_frame =  display_image_mean.data();
+	const std::string TXTfilename = GetPGMFileName(dest_sub_path, "sbf161_img_*", position_index, 1250);
+	FILE * picFile;
+	picFile = fopen (TXTfilename.c_str(), "wb");
+	fwrite( p_single_frame, sizeof(uint16_t), 128*128, picFile);
+	fclose(picFile);
+
+	std::chrono::high_resolution_clock::time_point tsave_end = std::chrono::high_resolution_clock::now();
 	//save individual pics
 	
 	//for (int frame_index = 0; frame_index < frame_number; frame_index++)
@@ -297,11 +307,11 @@ void CreateDisplayImageExample(HANDLE_IPS_ACQ handle_ips, int position_index, in
 	//duration_saving = ( std::clock() - start_saving ) / (double) CLOCKS_PER_SEC;
 	//std::cout << "\nDuration for saving "<< fpg << " frames: " << duration_saving << " seconds"<< std::endl ;
 
-	/*std::cout << "   "<<std::endl;
-	std::cout << "acquring: " << std::chrono::duration_cast<std::chrono::duration<double>>(t5 - t4).count()<<std::endl;
-	std::cout << "saving:    " << std::chrono::duration_cast<std::chrono::duration<double>>(t6 - t5).count()<<std::endl;
-	std::cout << "total time: " << std::chrono::duration_cast<std::chrono::duration<double>>(t6 - t4).count();
-	std::cout << "   "<<std::endl;*/
+	
+	//std::cout << "Grabbing 1000 frames: " << std::chrono::duration_cast<std::chrono::duration<double>>(tgrab_end - tgrab_start).count()<< "s" <<std::endl;
+	//std::cout << "Decommute:    " << std::chrono::duration_cast<std::chrono::duration<double>>(tdecommute_end - tgrab_end).count()<< "s" <<std::endl;
+	//std::cout << "Saving: " << std::chrono::duration_cast<std::chrono::duration<double>>(tsave_end - tdecommute_end).count()<< "s" <<std::endl;;
+	//std::cout << "   "<<std::endl;
 
 }
 
@@ -327,6 +337,28 @@ void ipsPrintDiagnostics(HANDLE_IPS_ACQ handle) {
 		std::cout << "Frame grabber diagnostics : " << std::string(diag_buffer.data()) << std::endl;	//print it
 }
 
+int32_t IntegrationTimeWriteExample(HANDLE_IPS_ACQ handle_ips,
+                                    int row_ticks,
+                                    int col_ticks){
+  // First write the desired row and col integration ticks
+  int32_t result = IPS_SetInt32Param( handle_ips,
+                                      IPS_WRITE_INTEGRATION_ROW_TICKS,
+                                      row_ticks);
+  if (IPS_FAILED(result)) return result;
+
+  result = IPS_SetInt32Param( handle_ips,
+                              IPS_WRITE_INTEGRATION_COL_TICKS,
+                              col_ticks);
+  if (IPS_FAILED(result)) return result;
+
+  // Write the integration time using the last stored row and col ticks
+  result = IPS_SetInt32Param( handle_ips,
+                              IPS_WRITE_INTEGRATION_TIME,
+                              0 /*not used*/);
+  if (IPS_FAILED(result)) return result;
+  cout << "Integration time successfully written to camera" << endl;
+  return result;
+}
 
 void aerotechCleanup(A3200Handle h) {
 	CHECK_A3200(A3200ProgramStop(h, TASKID_01));
@@ -335,7 +367,7 @@ void aerotechCleanup(A3200Handle h) {
 }
 
 void holo_capture(int wn, int positions, int QCL_index, int QCL_MaxCur, HANDLE_IPS_ACQ handle, DOUBLE result_stage,
-				  std::string cmd_step, std::string cmd_return, int frames, int lp){
+				  std::string cmd_step, std::string cmd_return, int frames, int lp, std::string dest_sub_path){
 
 					  uint32_t ret;												//return value used by MIRcat laser control
 					  bool IsOn = false;
@@ -381,22 +413,15 @@ void holo_capture(int wn, int positions, int QCL_index, int QCL_MaxCur, HANDLE_I
 
 							  for (int i = 0; i < positions; i++){
 
-									std::stringstream sub_dir;												//create an empty string stream
-									sub_dir << dest_path << i << "\\";												//append to the parent dir string
-									std::string dest_sub_path = sub_dir.str();
-									int mkdirFlag = mkdir(dest_sub_path.c_str());
-									if (mkdirFlag != 0){
-									printf ("Error : %s\n", strerror(errno));
-									}
-
 
 								  A3200CommandExecute(hstage, TASKID_01, cmd_step.c_str(), &result_stage);		//move the stage
 				//				  std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 								  A3200CommandExecute(hstage, TASKID_01, "MOVEDELAY Z, 200", &result_stage);		//wait
-			//					  std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+								  std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+								  std::cout << "   "<<std::endl;
 								  std::cout << "capturing images at "<< i+1<<"th position"<< std::endl;				//display the number of images
 								  CreateDisplayImageExample(handle, i, frames, dest_sub_path);											//capture images		 
-			//					  std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
+								  std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
 
 								 // rtsProgressBar((float)(i + 1) / (float)positions * 100);
 
@@ -407,7 +432,8 @@ void holo_capture(int wn, int positions, int QCL_index, int QCL_MaxCur, HANDLE_I
 								  
 								  //std::cout << "move stage once: " << std::chrono::duration_cast<std::chrono::duration<double>>(t1 - t0).count()<<std::endl;
 								  //std::cout << "wait after move: " << std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count()<<std::endl;
-								  //std::cout << "acquire images " << std::chrono::duration_cast<std::chrono::duration<double>>(t3 - t2).count()<<std::endl;
+								  //std::cout << "Time spent on this position: " << std::chrono::duration_cast<std::chrono::duration<double>>(t3 - t2).count()<< "s" <<std::endl;
+
 							  }
 									
 							  A3200CommandExecute(hstage, TASKID_01, cmd_return.c_str(), &result_stage);				//move stage back to origin
@@ -418,13 +444,16 @@ void holo_capture(int wn, int positions, int QCL_index, int QCL_MaxCur, HANDLE_I
 
 int main(int argc, char* argv[]) {
 
+	std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+
 	stim::arglist args;
 	args.add("help", "prints usage information");
-	args.add("zstep", "number of micrometers between images", "0.5", "positive value describing stage motion in microns");
+	args.add("zstep", "number of micrometers between images", "1", "positive value describing stage motion in microns");
 	args.add("frames", "total number of images to collect", "1000", "integer (currently between 1 and 5000)");
 	args.add("WN", "wavenumber to do imaging at", "1250", "integer (currently between 910 and 1900)");
-	args.add("laserpower","laser power to do imaging at","50","integer (currently between 1 and 100)");
-	args.add("positions","number of different hologram positions","16","integer (currently between 1 and 4)");
+	args.add("laserpower","laser power to do imaging at","90","integer (currently between 1 and 100)");
+	args.add("positions","number of different hologram positions","20","integer (currently between 1 and 100)");
+	args.add("inte","integration time of grabbing a single frame","19","integer (currently between 15 and 45)");
 	args.parse(argc, argv);
 
 	if(args["help"]){
@@ -442,6 +471,7 @@ int main(int argc, char* argv[]) {
 	int wn = args["WN"].as_int();
 	int lp = args["laserpower"].as_int();
 	int positions = args["positions"].as_int();
+	int inte = args["inte"].as_int();
 
 	DOUBLE result_stage;										//return value used by Aerotech stage control
 
@@ -567,13 +597,32 @@ int main(int argc, char* argv[]) {
 		"$(IPS_SDK_DATA_DIR)\\license.lcx",				//specify the license
 		&hcam));											//fill the handle
 
+	//calculate row ticks and column ticks for specified integration time
+	
+	int r = inte / 17.25;
+	int c = (inte - r * 17.25) / 15 * 120;
+
+	int r_tick = 1 + r;										// R_tick = 1 + 1 means 17.25 microsecond integration time
+	int c_tick = 1 + c;                                   // C_tick = 1 + 120 means 15 microsecond integration time
+		 
+	
+	//set the specified integration time to the camera head
+	int32_t intewrite = IntegrationTimeWriteExample(hcam, r_tick, c_tick);
+
+	//print out the camera parameters
 	ipsPrintDiagnostics(hcam);
 
 	//
 	//imaging
 	//
 
-
+	std::stringstream sub_dir;												//create an empty string stream
+	sub_dir << dest_path << "\\";												//append to the parent dir string
+	std::string dest_sub_path = sub_dir.str();
+	int mkdirFlag = mkdir(dest_sub_path.c_str());
+	if (mkdirFlag != 0){
+	printf ("Error : %s\n", strerror(errno));
+	}
 
 		//tuning laser
 		
@@ -588,25 +637,25 @@ int main(int argc, char* argv[]) {
 		
 			if ( wn >= 910 && wn <= 1170){
 
-			holo_capture(wn, positions, 4, 1400, hcam, result_stage, cmd_step, cmd_return, frames, lp);
+			holo_capture(wn, positions, 4, 1400, hcam, result_stage, cmd_step, cmd_return, frames, lp, dest_sub_path);
 
 			}
 
 			if ( wn >= 1172 && wn <= 1402){
 
-			holo_capture(wn, positions, 3, 1000, hcam, result_stage, cmd_step, cmd_return, frames, lp);
+			holo_capture(wn, positions, 3, 1000, hcam, result_stage, cmd_step, cmd_return, frames, lp, dest_sub_path);
 
 			}
 
 			if ( wn >= 1404 && wn <= 1700){
 
-			holo_capture(wn, positions, 2, 800, hcam, result_stage, cmd_step, cmd_return, frames, lp);
+			holo_capture(wn, positions, 2, 800, hcam, result_stage, cmd_step, cmd_return, frames, lp, dest_sub_path);
 
 			}
 
 			if ( wn >= 1702 && wn <= 1910){
 
-			holo_capture(wn, positions, 1, 550, hcam, result_stage, cmd_step, cmd_return, frames, lp);
+			holo_capture(wn, positions, 1, 550, hcam, result_stage, cmd_step, cmd_return, frames, lp, dest_sub_path);
 
 			}
 		
@@ -616,6 +665,8 @@ int main(int argc, char* argv[]) {
 			std::cout << "Laser Emission off." << std::endl;
 		}
 		std::cout << "   "<<std::endl;
+		std::chrono::high_resolution_clock::time_point t4 = std::chrono::high_resolution_clock::now();
+		std::cout << "Total Imaging Time: " << std::chrono::duration_cast<std::chrono::duration<double>>(t4 - t1).count()<< "s" <<std::endl;
 		//if(!(MIRcatSDK_DisarmLaser())){
 			//std::cout << "Laser Disarmed." << std::endl;
 		//}

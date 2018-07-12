@@ -14,9 +14,9 @@ ncap = str(100);                         #number of captured images passed into 
 inte_fold = 30;                         #effective integration time = 15 microsecond * inte_fold
 pixel_mean = list()
 pixel_std = list()
-#for i in range(1, inte_fold + 1):
-#    nframe = str(15 * i * 4)
-#    subprocess.call([r"qcl-snap.exe", imfolder, '--inte_time',nframe,'--ncap',ncap,'--WN','1220'])
+for i in range(1, inte_fold + 1):
+    nframe = str(15 * i * 4)
+    subprocess.call([r"qcl-snap.exe", imfolder, '--inte_time',nframe,'--ncap',ncap,'--WN','1220'])
 
     
     
