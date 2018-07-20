@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
 """
+Created on Fri Jul 20 11:20:56 2018
+
+@author: shihao
+"""
+
+# -*- coding: utf-8 -*-
+"""
 Created on Wed Jul 11 14:12:59 2018
 
 @author: shihao
@@ -114,87 +121,146 @@ else:
 #ani.save(data_dir + '\\demo_' + str(num_frames) + '.mp4',writer=writer)
 
 
+
+
 #specify which portion of hologram will be used to calculate field
-num = 3                    #number of measurements used to do phase reconstruction. theoritically more than 3 is enough
+#num = 3                    #number of measurements used to do phase reconstruction. theoritically more than 3 is enough
 start = 0                   #the starting point of sampling from the raw dataset
-end = start + num           #the end point of sampling
+#end = start + num           #the end point of sampling
 lambdA = 8                  #wavelength of the laser
 k = 2 * numpy.pi / lambdA   #wave vector k
 
 
+def cal_D(num):
+    
+    #D matrix denoting the difference between consecutive measuremnts
+    D = [(image_seq_raw[:,:,start + i + 1] - image_seq_raw[:,:,start + i]) for i in range(num)]
+    D = numpy.asarray(D)
+    
+    return D + 0j
 
-#D matrix denoting the difference between consecutive measuremnts
-D = [(image_seq_raw[:,:,start + i + 1] - image_seq_raw[:,:,start + i]) for i in range(num)]
+def cal_PH(num):
+    
+    #P matrix denoting the phase shifting terms
+    P = [[numpy.exp(-1j * k * zstep * i), numpy.exp(1j * k * zstep * i)] for i in range(num)]
+    
+    #convert D and P to matrices or numpy arrays from lists
+    
+    P = numpy.matrix(numpy.asarray(P))
+    
+    #calculate the Hermitian conjugate of P matrix and its inverse
+    P_hermint = P.getH()
 
-#P matrix denoting the phase shifting terms
-P = [[numpy.exp(-1j * k * zstep * i), numpy.exp(1j * k * zstep * i)] for i in range(num)]
+    return P_hermint + 0j
 
-#convert D and P to matrices or numpy arrays from lists
-D = numpy.asarray(D)
-P = numpy.matrix(numpy.asarray(P))
+def cal_PH_P_Ph(num):
+    P = [[numpy.exp(-1j * k * zstep * i), numpy.exp(1j * k * zstep * i)] for i in range(num)]
+    
+    PH_P_inv = numpy.linalg.inv(cal_PH(num) * P)
 
-#calculate the Hermitian conjugate of P matrix and its inverse
-P_hermint = P.getH()
-PH_P_inv = numpy.linalg.inv(P_hermint * P)
+    #linear P matrix term before D matrix when calculating interferometric cross terms u
+    PH_P_Ph =  PH_P_inv * cal_PH(num)
+    PH_P_Ph = numpy.asarray(PH_P_Ph)
+    PH_P_inv = numpy.linalg.inv(cal_PH(num) * P)
 
-#linear P matrix term before D matrix when calculating interferometric cross terms u
-PH_P_Ph =  PH_P_inv * P_hermint
+    #linear P matrix term before D matrix when calculating interferometric cross terms u
+    PH_P_Ph =  PH_P_inv * cal_PH(num)
 
-#initialize interferometric cross terms u as a 2x1 matrix for each point on the image with itself and its conjugate
-u = numpy.zeros((2,1,128,128)) + 0j
+    return PH_P_Ph + 0j
 
-#transform P matrix term and duplicate itself into higher dimention for dot product with D matrix for the whole image
-PH_P_Ph = numpy.asarray(PH_P_Ph)
-PH_P_Ph = numpy.repeat((numpy.repeat(numpy.reshape(PH_P_Ph,(2,num,1,1)),128,axis = 2)),128,axis = 3)
+num = numpy.arange(4,200,1)
 
-#for each pixel on the image, do a doc product to calculate interferometric cross terms u
-D = D.reshape(num,1,128,128)  + 0j
-for i in range(128):
-    for j in range(128):
-        u[:,:,i,j] = numpy.dot(PH_P_Ph[:,:,i,j], D[:,:,i,j])
+D_a = numpy.zeros(numpy.size(num)) + 0j
+PH_a = numpy.zeros(numpy.size(num)) + 0j
+PH_P_Ph_a = numpy.zeros(numpy.size(num)) + 0j
 
-#initialize a field to store u from the cross terms
-f = numpy.zeros((1,1,128,128)) + 0j
-f[:] = u[0,:,:,:]
-f = f.reshape((128,128))
+for i in range(len(num)):
+    D_a[i] = numpy.average(cal_D(num[i]))
+    PH_a[i] = numpy.average(cal_PH(num[i]))
+    PH_P_Ph_a[i] = numpy.average(cal_PH_P_Ph(num[i]))
 
-print('Number of Measurements: ' + str(num))
-
-print('Range of D Matrix: ' + str(numpy.min(D)) + ' ~ ' + str(numpy.max(D)))
-print('Average of D Matrix: ' + str(numpy.average(D)))
-
-print('Range of P_hermitian: ' + str(numpy.min(P_hermint)) + ' ~ ' + str(numpy.max(P_hermint)))
-print('Average of P_hermitian: ' + str(numpy.average(P_hermint)))
-
-print('Range of P_Ph Term: ' + str(numpy.min(PH_P_Ph)) + ' ~ ' + str(numpy.max(PH_P_Ph)))
-print('Average of P_Ph Term: ' + str(numpy.average(PH_P_Ph)))
-
-#calculate the scattering field F from reference field and extra terms in the equation
-expterm = numpy.exp(-1j * k * zstep) - 1
-dominator = expterm * ref_sqrt
-F = f / dominator
-
-#plot out scattering field
 plt.figure()
 
-plt.subplot(221)
-plt.imshow(image_seq_raw[:,:,start])
-plt.title('1st Raw Image')
-plt.colorbar()
+plt.subplot(311)
+plt.plot(num, numpy.abs(D_a), 'r')
+plt.text(100, 30, 'D Matrix')
+plt.xlabel('Number of Measurements')
+plt.ylabel('Absolute Value')
 
-plt.subplot(222)
-plt.imshow(numpy.abs(F))
-plt.title('Absolute Value')
-plt.colorbar()
+plt.subplot(312)
+plt.plot(num, numpy.abs(PH_a), 'b')
+plt.text(100, 0.20,'Hermitian P Matrix')
+plt.xlabel('Number of Measurements')
+plt.ylabel('Absolute Value')
 
-plt.subplot(223)
-plt.imshow(numpy.real(F))
-plt.title('Real Part')
-plt.colorbar()
+plt.subplot(313)
+plt.plot(num, numpy.abs(PH_P_Ph_a), 'g')
+plt.text(100, 0.05,'PH_P_PH term')
+plt.xlabel('Number of Measurements')
+plt.ylabel('Absolute Value')
 
-plt.subplot(224)
-plt.imshow(numpy.imag(F))
-plt.title('Imaginary Part')
-plt.colorbar()
+plt.suptitle('Average Value of Parameter Matrices', fontsize = 15)
+plt.show()
 
-plt.suptitle('Target Field plots from ' + str(start) + 'th of the hologram with ' + str(num) + ' measurements', fontsize = 15)
+
+
+
+#
+##initialize interferometric cross terms u as a 2x1 matrix for each point on the image with itself and its conjugate
+#u = numpy.zeros((2,1,128,128)) + 0j
+#
+##transform P matrix term and duplicate itself into higher dimention for dot product with D matrix for the whole image
+#PH_P_Ph = numpy.asarray(PH_P_Ph)
+#PH_P_Ph = numpy.repeat((numpy.repeat(numpy.reshape(PH_P_Ph,(2,num,1,1)),128,axis = 2)),128,axis = 3)
+#
+##for each pixel on the image, do a doc product to calculate interferometric cross terms u
+#D = D.reshape(num,1,128,128)  + 0j
+#for i in range(128):
+#    for j in range(128):
+#        u[:,:,i,j] = numpy.dot(PH_P_Ph[:,:,i,j], D[:,:,i,j])
+#
+##initialize a field to store u from the cross terms
+#f = numpy.zeros((1,1,128,128)) + 0j
+#f[:] = u[0,:,:,:]
+#f = f.reshape((128,128))
+#
+#print('Number of Measurements: ' + str(num))
+#
+#print('Range of D Matrix: ' + str(numpy.min(D)) + ' ~ ' + str(numpy.max(D)))
+#print('Average of D Matrix: ' + str(numpy.average(D)))
+#
+#print('Range of P_hermitian: ' + str(numpy.min(P_hermint)) + ' ~ ' + str(numpy.max(P_hermint)))
+#print('Average of P_hermitian: ' + str(numpy.average(P_hermint)))
+#
+#print('Range of P_Ph Term: ' + str(numpy.min(PH_P_Ph)) + ' ~ ' + str(numpy.max(PH_P_Ph)))
+#print('Average of P_Ph Term: ' + str(numpy.average(PH_P_Ph)))
+#
+##calculate the scattering field F from reference field and extra terms in the equation
+#expterm = numpy.exp(-1j * k * zstep) - 1
+#dominator = expterm * ref_sqrt
+#F = f / dominator
+#
+##plot out scattering field
+#plt.figure()
+#
+#plt.subplot(221)
+#plt.imshow(image_seq_raw[:,:,start])
+#plt.title('1st Raw Image')
+#plt.colorbar()
+#
+#plt.subplot(222)
+#plt.imshow(numpy.abs(F))
+#plt.title('Absolute Value')
+#plt.colorbar()
+#
+#plt.subplot(223)
+#plt.imshow(numpy.real(F))
+#plt.title('Real Part')
+#plt.colorbar()
+#
+#plt.subplot(224)
+#plt.imshow(numpy.imag(F))
+#plt.title('Imaginary Part')
+#plt.colorbar()
+#
+#plt.suptitle('Target Field plots from ' + str(start) + 'th of the hologram with ' + str(num) + ' measurements', fontsize = 15)
